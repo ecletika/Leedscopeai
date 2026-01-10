@@ -43,7 +43,6 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   // Filters State
   const [websiteFilter, setWebsiteFilter] = useState<'all' | 'has_site' | 'no_site'>('all');
   const [textFilter, setTextFilter] = useState('');
-  const [nifFilter, setNifFilter] = useState(''); // Estado para filtro de NIF
   const [secondaryCaeFilter, setSecondaryCaeFilter] = useState('');
   const [foundationYearFilter, setFoundationYearFilter] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -90,7 +89,6 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
     setLogs({});
     setWebsiteFilter('all');
     setTextFilter('');
-    setNifFilter('');
     setSecondaryCaeFilter('');
     setFoundationYearFilter('');
 
@@ -287,13 +285,6 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
     if (websiteFilter === 'has_site' && !lead.hasWebsite) return false;
     if (websiteFilter === 'no_site' && lead.hasWebsite) return false;
     
-    // Advanced Filter: NIF
-    if (nifFilter) {
-      if (!lead.nif || !lead.nif.includes(nifFilter)) {
-        return false;
-      }
-    }
-
     // Advanced Filter: Secondary CAE
     if (secondaryCaeFilter) {
         if (!lead.secondaryCae || !lead.secondaryCae.some(c => c.toLowerCase().includes(secondaryCaeFilter.toLowerCase()))) {
@@ -574,17 +565,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
                       {/* Advanced Filters Panel */}
                       {showAdvancedFilters && (
-                        <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-2 fade-in">
-                            <div>
-                                <label className="text-xs font-bold text-gray-500 mb-1 block">NIF</label>
-                                <input 
-                                  type="text" 
-                                  value={nifFilter}
-                                  onChange={e => setNifFilter(e.target.value)}
-                                  placeholder="Ex: 510..."
-                                  className="w-full bg-ai-dark border border-gray-700 rounded p-2 text-xs text-white focus:border-ai-accent outline-none"
-                                />
-                            </div>
+                        <div className="bg-gray-800/30 border border-gray-700 rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 fade-in">
                             <div>
                                 <label className="text-xs font-bold text-gray-500 mb-1 block">CAE Secundário</label>
                                 <input 

@@ -8,6 +8,25 @@ const getClient = () => {
 };
 
 /**
+ * Helper to detect generic names that look fake
+ */
+const isGenericName = (name: string): boolean => {
+    const lower = name.toLowerCase().trim();
+    const generics = [
+        'restaurante', 'café', 'pastelaria', 'padaria', 'loja', 'empresa', 
+        'cabeleireiro', 'barbeiro', 'oficina', 'mecânico', 'dentista', 
+        'clínica', 'advogado', 'contabilidade', 'imobiliária', 'supermercado',
+        'unknown', 'n/a', 'nome da empresa', 'loja de roupa'
+    ];
+    // Se o nome for exatamente igual a uma categoria genérica
+    if (generics.includes(lower)) return true;
+    // Se o nome tiver menos de 3 caracteres
+    if (lower.length < 3) return true;
+    
+    return false;
+};
+
+/**
  * Agent 1: Search Agent (Module 1)
  * Updated to handle empty location/niche if aiContext is provided.
  */
@@ -29,38 +48,46 @@ export const searchLeadsInLocation = async (
 
   if (mode === 'street') {
     prompt = `
-      TASK: Perform a "Street-by-Street" scan for businesses.
+      ROLE: High-Precision Lead Scraper.
+      TASK: Perform a virtual "Street-by-Street" scan for REAL businesses.
       TARGET LOCATION: ${locStr} (Portugal).
       TARGET NICHE: ${nicheStr}.
       ${contextInstruction}
 
-      STRATEGY:
-      1. Identify the relevant commercial streets based on the location or instruction.
-      2. List real businesses found.
-      3. Focus on local businesses, street shops, and offices.
+      STRICT RULES (ANTI-HALLUCINATION):
+      1. You must use Google Maps/Search to verify the business exists.
+      2. **DO NOT INVENT NAMES**. If you cannot find a specific business name, DO NOT return generic placeholders like "Loja de Sapatos" or "Restaurante Local".
+      3. Return ONLY businesses that have a distinct brand name (e.g., "Café Central" is okay, "Café" is NOT).
+      4. If you find NO real businesses matching the criteria, return an empty array [].
 
       EXTRACT FOR EACH LEAD:
-      - Company Name (MUST BE A REAL NAME, do not invent)
-      - Full Address
+      - Company Name (Exact commercial name found on Maps)
+      - Full Address (Must be specific, street name + number if possible)
       - Website URL (if available, set to null if not)
       - Phone Number
       - Email (if publicly visible)
 
       CRITICAL OUTPUT INSTRUCTION:
       - Return a VALID JSON ARRAY.
-      - If no specific businesses are found, return an empty array [].
-      - Do not return generic placeholders like "Loja de Sapatos".
       - JSON ONLY. No markdown.
     `;
   } else {
     prompt = `
-      TASK: Find real local businesses.
+      ROLE: Strict B2B Data Miner.
+      TASK: Find verified local businesses.
       TARGET LOCATION: ${locStr} (Portugal).
       TARGET NICHE: ${nicheStr}.
       ${contextInstruction}
       
+      STRICT RULES (ANTI-HALLUCINATION):
+      1. ONLY return real, verifiable entities.
+      2. IGNORE directory aggregators (like TripAdvisor lists, Yelp lists). Find the actual business.
+      3. If a business does not have a website, that is a PERFECT LEAD. Prioritize these.
+      4. If you cannot confirm the business name, DO NOT include it.
+      5. If no leads are found, strictly return [].
+
       For each business, extract:
-      - Company Name (MUST BE A REAL NAME)
+      - Company Name (Real Brand Name)
       - Website URL (if available, otherwise null)
       - Phone Number
       - Full Address
@@ -68,7 +95,6 @@ export const searchLeadsInLocation = async (
       
       CRITICAL OUTPUT INSTRUCTION:
       - Return a VALID JSON ARRAY.
-      - If no real businesses are found that match the criteria, return empty [].
       - JSON ONLY. No markdown.
     `;
   }
@@ -98,7 +124,15 @@ export const searchLeadsInLocation = async (
 
     // Filter out obviously bad data immediately
     return parsed
-      .filter((item: any) => item.companyName && item.companyName !== 'Unknown' && item.companyName !== 'N/A')
+      .filter((item: any) => {
+          // Validation 1: Check for generic names
+          if (!item.companyName || isGenericName(item.companyName)) return false;
+          
+          // Validation 2: Must have some location data
+          if (!item.address && !location) return false;
+
+          return true;
+      })
       .map((item: any) => ({
         companyName: item.companyName,
         website: item.website || undefined,
@@ -140,16 +174,23 @@ export const analyzeAndGenerateProposal = async (leadData: Partial<Lead>): Promi
     Location: ${leadData.location}
     Niche: ${leadData.niche}
     
-    --- AGENT TASK ---
-    1. Verify if this is a REAL company in Portugal via Google Search/Maps.
-    2. If it is NOT a real company or you cannot find data, return {"valid": false}.
-    3. If valid, find: NIF, CAE, Foundation Year, Map Rating.
-    4. Score the website (0-10).
-    5. Generate a proposal.
+    --- AGENT TASK (AUDITOR) ---
+    1. **VERIFICATION**: Is this a REAL active company in Portugal? Use Google Maps/Search.
+       - If it looks like a fake entry, a duplicate, or permanently closed, return {"valid": false}.
+       - If the address is extremely vague (just "Portugal"), return {"valid": false}.
+    
+    2. **DATA EXTRACTION**: If valid, find:
+       - NIF (Tax ID)
+       - CAE (Economic Activity Code)
+       - Maps Rating & Review Count
+    
+    3. **ANALYSIS**:
+       - Score the website (0-10). If no website, score is 0.
+       - Diagnose the digital presence.
 
     --- OUTPUT FORMAT ---
     Return strictly JSON.
-    If Invalid:
+    If Invalid/Ghost Lead:
     { "valid": false }
 
     If Valid:
@@ -196,11 +237,13 @@ export const analyzeAndGenerateProposal = async (leadData: Partial<Lead>): Promi
     const data = JSON.parse(rawText.trim());
 
     // Strict validation check
-    if (data.valid === false || !data.nif || data.nif === 'Not Found' || data.nif === 'N/A') {
-        // If we can't even find a NIF or the AI says it's invalid, we treat it as a ghost lead.
-        // However, some valid leads might not have public NIF easily found.
-        // Let's rely on "valid" flag or if name is generic.
-        if (data.valid === false) return null;
+    // If the agent explicitly says it's not valid
+    if (data.valid === false) return null;
+
+    // Additional Safety check: If NIF is not found AND Address is vague AND Rating is null -> Probably a ghost lead
+    if ((!data.nif || data.nif === 'N/A') && (!data.mapsRating)) {
+       // Allow it only if the name looks very specific
+       if (isGenericName(leadData.companyName || '')) return null;
     }
 
     return {
