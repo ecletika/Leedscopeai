@@ -13,8 +13,8 @@ const MOCK_USERS: User[] = [
     password: 'Portugal@130568', // Senha Admin
     role: 'admin',
     plan: 'Agency',
-    leadsGenerated: 124,
-    leadsLimit: 9999,
+    credits: 999,
+    campaigns: [],
     status: 'active'
   },
   {
@@ -24,8 +24,8 @@ const MOCK_USERS: User[] = [
     password: '123', // Senha simples para teste
     role: 'user',
     plan: 'Pro',
-    leadsGenerated: 45,
-    leadsLimit: 150,
+    credits: 10, // Começa com 10 créditos de pesquisa
+    campaigns: [],
     status: 'active'
   }
 ];
@@ -75,6 +75,17 @@ export default function App() {
     setLoginPassword('');
     setView('landing');
   };
+
+  const handleUpdateUsers = (updatedUsers: User[]) => {
+      setUsers(updatedUsers);
+      // Se o usuário atual foi atualizado, reflete no estado local
+      if (currentUser) {
+          const updatedCurrent = updatedUsers.find(u => u.id === currentUser.id);
+          if (updatedCurrent) {
+              setCurrentUser(updatedCurrent);
+          }
+      }
+  }
 
   return (
     <>
@@ -155,7 +166,7 @@ export default function App() {
         <Dashboard 
           currentUser={currentUser} 
           allUsers={users}
-          setAllUsers={setUsers}
+          setAllUsers={handleUpdateUsers}
           onLogout={handleLogout}
         />
       )}

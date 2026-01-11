@@ -1,364 +1,280 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Lead } from '../types';
-import { ChevronDown, ChevronUp, Globe, Mail, Phone, ExternalLink, XCircle, CheckCircle, Smartphone, AlertTriangle, Database, Zap, X, Filter, SlidersHorizontal, MonitorPlay, Building2, Briefcase, Star, MapPin, Send, Copy, FileText, Hash, Calendar, Users as UsersIcon, Coins } from 'lucide-react';
+import { ChevronDown, ChevronUp, Globe, Mail, Phone, ExternalLink, Smartphone, AlertTriangle, Eye, Video, Instagram, Facebook, Linkedin, Youtube, CheckCircle, Flame, Snowflake, Scale, ScanEye, Star, Clock, Tag, MessageSquare, MapPin, FileText, Bot, Briefcase, Code, Share2 } from 'lucide-react';
 
 interface LeadResultsProps {
   leads: Lead[];
+  onInvestigate: (id: string) => void;
+  onGenerateProposal: (lead: Lead) => void;
+  onAskAI: (lead: Lead) => void;
+  onGenerateSite: (lead: Lead) => void;
 }
 
-const ScoreBadge: React.FC<{ score: number }> = ({ score }) => {
-  let color = 'bg-red-500/20 text-red-400 border-red-500/30';
-  if (score >= 4) color = 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
-  if (score >= 7) color = 'bg-green-500/20 text-green-400 border-green-500/30';
-
-  return (
-    <div className={`flex flex-col items-center justify-center w-12 h-12 rounded-full border-2 ${color}`}>
-      <span className="text-lg font-bold leading-none">{score}</span>
-      <span className="text-[8px] uppercase font-bold opacity-80">Score</span>
-    </div>
-  );
+const PotentialBadge: React.FC<{ potential: 'Hot' | 'Medium' | 'Cold' }> = ({ potential }) => {
+    if (potential === 'Hot') {
+        return <span className="flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-bold uppercase"><Flame className="w-3 h-3" /> Quente</span>;
+    }
+    if (potential === 'Medium') {
+        return <span className="flex items-center gap-1 px-2 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded text-xs font-bold uppercase"><Scale className="w-3 h-3" /> Médio</span>;
+    }
+    return <span className="flex items-center gap-1 px-2 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-bold uppercase"><Snowflake className="w-3 h-3" /> Frio</span>;
 };
 
-const LeadCard: React.FC<{ lead: Lead }> = ({ lead }) => {
+const SocialIcon: React.FC<{ network: string, url: string }> = ({ network, url }) => {
+    let Icon = Globe;
+    let color = "text-gray-400";
+    
+    if (network === 'instagram') { Icon = Instagram; color = "text-pink-500"; }
+    if (network === 'facebook') { Icon = Facebook; color = "text-blue-500"; }
+    if (network === 'linkedin') { Icon = Linkedin; color = "text-blue-400"; }
+    if (network === 'youtube') { Icon = Youtube; color = "text-red-500"; }
+    if (network === 'tiktok') { Icon = Video; color = "text-black bg-white rounded-full p-0.5"; }
+
+    return (
+        <a href={url} target="_blank" rel="noopener noreferrer" className={`hover:scale-110 transition-transform ${color}`}>
+            <Icon className="w-4 h-4" />
+        </a>
+    );
+};
+
+const LeadCard: React.FC<{ 
+    lead: Lead, 
+    onInvestigate: (id: string) => void,
+    onGenerateProposal: (lead: Lead) => void,
+    onAskAI: (lead: Lead) => void,
+    onGenerateSite: (lead: Lead) => void
+}> = ({ lead, onInvestigate, onGenerateProposal, onAskAI, onGenerateSite }) => {
   const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'analysis' | 'email'>('analysis');
-  const [emailCopied, setEmailCopied] = useState(false);
-  const isDiscarded = lead.status === 'discarded';
-
-  const handleOpenSite = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!lead.generatedSiteCode) return;
-    const blob = new Blob([lead.generatedSiteCode], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-  };
-
-  const copyEmail = () => {
-    if (lead.generatedEmail) {
-        const text = `Subject: ${lead.generatedEmail.subject}\n\n${lead.generatedEmail.body}`;
-        navigator.clipboard.writeText(text);
-        setEmailCopied(true);
-        setTimeout(() => setEmailCopied(false), 2000);
-    }
-  };
 
   return (
-    <div className={`border rounded-lg overflow-hidden transition-all ${isDiscarded ? 'bg-ai-dark/50 border-gray-800 opacity-60' : 'bg-ai-card border-gray-700 hover:border-ai-accent/30'}`}>
-      <div 
-        className="p-4 flex items-center justify-between cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-4">
-          <ScoreBadge score={lead.websiteScore} />
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className={`font-bold text-lg ${isDiscarded ? 'text-gray-500 line-through' : 'text-white'}`}>{lead.companyName}</h3>
-              <span className="text-xs px-2 py-0.5 bg-gray-800 text-gray-400 rounded border border-gray-700 font-mono">{lead.niche}</span>
-              
-              {lead.cae && lead.cae !== 'N/A' && (
-                <span className="text-xs px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded border border-purple-500/20 font-mono flex items-center gap-1" title="CAE Principal">
-                   <Hash className="w-3 h-3" /> {lead.cae}
-                </span>
-              )}
-
-              {lead.nif && lead.nif !== 'N/A' && (
-                <span className="text-xs px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 font-mono flex items-center gap-1" title="NIF">
-                   <FileText className="w-3 h-3" /> {lead.nif}
-                </span>
-              )}
-
-              {lead.foundationYear && lead.foundationYear !== 'N/A' && (
-                <span className="text-xs px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded border border-emerald-500/20 font-mono flex items-center gap-1" title="Ano de Fundação">
-                   <Calendar className="w-3 h-3" /> {lead.foundationYear}
-                </span>
-              )}
-
-              {isDiscarded && <span className="text-xs px-2 py-0.5 bg-gray-800 text-gray-400 rounded border border-gray-700">DISCARDED</span>}
+    <div className="bg-ai-card border border-gray-700 rounded-lg overflow-hidden hover:border-ai-accent/50 transition-all group">
+      <div className="p-4 flex items-center justify-between cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className="flex items-center gap-4 flex-1">
+          {/* Main Info */}
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-bold text-lg text-white group-hover:text-ai-accent transition-colors">{lead.companyName}</h3>
+                <PotentialBadge potential={lead.potential} />
+                {(lead.mapsRating ?? 0) > 0 && (
+                   <span className="flex items-center gap-1 text-xs text-yellow-400 ml-2 bg-yellow-400/10 px-1.5 py-0.5 rounded border border-yellow-400/20">
+                     <Star className="w-3 h-3 fill-yellow-400" /> {lead.mapsRating} ({lead.mapsReviews})
+                   </span>
+                )}
             </div>
             
-            <div className="flex items-center gap-3 text-xs text-ai-muted mt-1">
-              <span className="flex items-center gap-1">
-                {lead.hasWebsite ? <Globe className="w-3 h-3 text-ai-success" /> : <XCircle className="w-3 h-3 text-ai-danger" />}
-                {lead.website || "No Website"}
-              </span>
-              <span className="w-1 h-1 bg-gray-600 rounded-full"></span>
-              <span className="flex items-center gap-1">
-                {lead.isProfessionalEmail ? <CheckCircle className="w-3 h-3 text-ai-success" /> : <AlertTriangle className="w-3 h-3 text-ai-warning" />}
-                {lead.email || "No Email"}
-              </span>
+            <div className="flex flex-wrap gap-4 text-xs text-gray-400">
+                <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> {lead.location}</span>
+                {lead.phone ? (
+                    <span className="flex items-center gap-1 text-white font-mono"><Phone className="w-3 h-3 text-green-400" /> {lead.phone}</span>
+                ) : (
+                    <span className="flex items-center gap-1 text-red-400"><Phone className="w-3 h-3" /> Sem telefone</span>
+                )}
+                
+                {lead.socials.length > 0 && (
+                    <div className="flex items-center gap-2 pl-2 border-l border-gray-700">
+                        {lead.socials.map((s, i) => <SocialIcon key={i} network={s.network} url={s.url} />)}
+                    </div>
+                )}
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-           {lead.generatedSiteCode && !isDiscarded && (
+
+        <div className="flex items-center gap-3">
+             {/* New Action Buttons */}
              <button 
-               onClick={handleOpenSite}
-               className="flex items-center gap-2 px-4 py-2 bg-ai-accent hover:bg-blue-600 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-blue-900/20"
+                onClick={(e) => { e.stopPropagation(); onAskAI(lead); }}
+                className="p-2 bg-gray-800 hover:bg-purple-600/50 text-purple-400 hover:text-white border border-gray-700 rounded-lg transition-all"
+                title="Perguntar à IA sobre este Lead"
              >
-               <MonitorPlay className="w-4 h-4" />
-               PREVIEW SITE
+                <Bot className="w-4 h-4" />
              </button>
-           )}
-           {expanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+
+             <button 
+                onClick={(e) => { e.stopPropagation(); onGenerateSite(lead); }}
+                className="p-2 bg-gray-800 hover:bg-green-600/50 text-green-400 hover:text-white border border-gray-700 rounded-lg transition-all"
+                title="Gerar Landing Page"
+             >
+                <Code className="w-4 h-4" />
+             </button>
+
+             <button 
+                onClick={(e) => { e.stopPropagation(); onGenerateProposal(lead); }}
+                className="p-2 bg-gray-800 hover:bg-blue-600/50 text-blue-400 hover:text-white border border-gray-700 rounded-lg transition-all"
+                title="Gerar Proposta Comercial"
+             >
+                <FileText className="w-4 h-4" />
+             </button>
+
+             {/* Storefront Investigation Button */}
+            {!lead.storefront.analyzed ? (
+                <button 
+                    onClick={(e) => { e.stopPropagation(); onInvestigate(lead.id); }}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white border border-purple-500/50 rounded text-xs font-bold transition-all"
+                >
+                    <ScanEye className="w-4 h-4" /> Fachada
+                </button>
+            ) : (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 rounded border border-gray-700">
+                    {lead.storefront.needsLedUpgrade ? 
+                        <span className="text-green-400 text-xs font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3"/> Precisa de LEDs</span> :
+                        <span className="text-gray-400 text-xs font-bold">Fachada OK</span>
+                    }
+                </div>
+            )}
+
+            <button onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}>
+                {expanded ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
+            </button>
         </div>
       </div>
 
       {expanded && (
-        <div className="border-t border-gray-800 bg-black/20 animate-in fade-in slide-in-from-top-2">
-            
-            {/* Tabs */}
-            <div className="flex border-b border-gray-800">
-                <button 
-                    onClick={() => setActiveTab('analysis')}
-                    className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'analysis' ? 'text-ai-accent border-b-2 border-ai-accent bg-ai-accent/5' : 'text-gray-400 hover:text-white'}`}
-                >
-                    Analysis & Proposal
-                </button>
-                <button 
-                    onClick={() => setActiveTab('email')}
-                    className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'email' ? 'text-ai-accent border-b-2 border-ai-accent bg-ai-accent/5' : 'text-gray-400 hover:text-white'}`}
-                >
-                    <Mail className="w-4 h-4" /> Outreach Email
-                </button>
-            </div>
+        <div className="p-6 bg-black/20 border-t border-gray-800 grid grid-cols-1 md:grid-cols-2 gap-6 animate-in slide-in-from-top-2 cursor-default">
+            {/* Left Column: Core Data & Services */}
+            <div className="space-y-6">
+                <div>
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-3">Dados de Contacto & Digital</h4>
+                    <div className="space-y-2 text-sm text-gray-300">
+                        <p className="flex items-center gap-2"><Globe className="w-4 h-4 text-ai-accent"/> <strong>Website:</strong> {lead.website ? <a href={lead.website} target="_blank" className="text-blue-400 hover:underline">{lead.website}</a> : "Não tem (Oportunidade!)"}</p>
+                        <p className="flex items-center gap-2"><Smartphone className="w-4 h-4 text-green-500"/> <strong>Telefones:</strong> {lead.allPhones.join(', ') || "Nenhum extra"}</p>
+                        <p className="flex items-center gap-2"><Mail className="w-4 h-4 text-yellow-500"/> <strong>Email:</strong> {lead.email || "Não público"}</p>
+                        
+                        {/* Improved NIF and CAE Display */}
+                        <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-700/50">
+                            <div className="flex items-center gap-2 bg-gray-800/50 px-2 py-1 rounded border border-gray-700 shadow-sm">
+                                <FileText className="w-3 h-3 text-ai-accent" />
+                                <span className="text-xs text-gray-500 font-bold uppercase">NIF:</span>
+                                <span className="font-mono text-white text-xs tracking-wide">{lead.nif || "N/A"}</span>
+                            </div>
+                            <div className="flex items-center gap-2 bg-gray-800/50 px-2 py-1 rounded border border-gray-700 shadow-sm">
+                                <Briefcase className="w-3 h-3 text-purple-400" />
+                                <span className="text-xs text-gray-500 font-bold uppercase">CAE:</span>
+                                <span className="font-mono text-white text-xs tracking-wide">{lead.cae || "N/A"}</span>
+                            </div>
+                        </div>
 
-          <div className="p-6">
-          {isDiscarded ? (
-             <div className="text-center py-4">
-                <X className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                <p className="text-gray-500">{lead.diagnosis}</p>
-             </div>
-          ) : activeTab === 'analysis' ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              
-              {/* Left Column: Data */}
-              <div className="space-y-6">
+                         {/* Social Analysis Report */}
+                         {lead.socialSummary && (
+                             <div className="mt-4 bg-gray-800/30 p-3 rounded border border-gray-700">
+                                 <h5 className="text-[10px] font-bold text-purple-400 uppercase mb-1 flex items-center gap-1">
+                                     <Share2 className="w-3 h-3"/> Relatório Social
+                                 </h5>
+                                 <p className="text-xs text-gray-400 italic leading-relaxed">"{lead.socialSummary}"</p>
+                             </div>
+                         )}
+                    </div>
+                </div>
+
+                {lead.servicesOffered && lead.servicesOffered.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                        <Tag className="w-3 h-3" /> Serviços Identificados
+                    </h4>
+                    <div className="flex flex-wrap gap-2">
+                        {lead.servicesOffered.map((service, i) => (
+                            <span key={i} className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-xs text-gray-300">
+                                {service}
+                            </span>
+                        ))}
+                    </div>
+                  </div>
+                )}
                 
-                {/* Company Intelligence Data */}
-                <div className="bg-ai-dark/50 border border-gray-700 rounded-lg p-4">
-                   <h5 className="text-xs font-bold text-ai-accent uppercase mb-3 flex items-center gap-2">
-                      <Building2 className="w-4 h-4" /> Enrichment Data (Module 3)
-                   </h5>
-                   <div className="grid grid-cols-1 gap-3">
-                      <div className="flex flex-col gap-1">
-                         <span className="text-[10px] uppercase text-gray-500 font-bold">Atividade Principal</span>
-                         <span className="text-sm text-gray-200 flex items-start gap-2">
-                           <Briefcase className="w-4 h-4 text-ai-warning mt-0.5 shrink-0" /> 
-                           {lead.businessActivity || "Analyzing..."}
-                         </span>
-                      </div>
-                      
-                      {(lead.mapsRating || lead.mapsReviews) && (
-                        <div className="flex flex-col gap-1">
-                           <span className="text-[10px] uppercase text-gray-500 font-bold">Google Maps</span>
-                           <span className="text-sm text-yellow-400 flex items-center gap-2">
-                             {lead.mapsRating && (
-                               <span className="flex items-center gap-1 font-bold">
-                                 {lead.mapsRating} <Star className="w-3 h-3 fill-current" />
-                               </span>
-                             )}
-                             {lead.mapsReviews && (
-                               <span className="text-gray-400 text-xs">({lead.mapsReviews} reviews)</span>
-                             )}
-                           </span>
-                        </div>
-                      )}
-
-                      <div className="grid grid-cols-2 gap-4 border-t border-gray-700/50 pt-3 mt-1">
-                        <div className="flex flex-col gap-1">
-                           <span className="text-[10px] uppercase text-gray-500 font-bold">NIF</span>
-                           <span className="text-sm text-gray-200 font-mono tracking-wider">
-                              {lead.nif || "N/A"}
-                           </span>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                           <span className="text-[10px] uppercase text-gray-500 font-bold">CAE Principal</span>
-                           <span className="text-sm text-gray-200 font-mono tracking-wider">
-                              {lead.cae || "N/A"}
-                           </span>
-                        </div>
-                      </div>
-
-                      {/* Expanded Financial Data */}
-                      <div className="grid grid-cols-3 gap-2 border-t border-gray-700/50 pt-3 mt-1">
-                         <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase text-gray-500 font-bold flex items-center gap-1">
-                                <Calendar className="w-3 h-3" /> Fundação
-                            </span>
-                            <span className="text-xs text-white font-medium">{lead.foundationYear || "N/A"}</span>
-                         </div>
-                         <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase text-gray-500 font-bold flex items-center gap-1">
-                                <Coins className="w-3 h-3" /> Capital
-                            </span>
-                            <span className="text-xs text-white font-medium">{lead.capitalSocial || "N/A"}</span>
-                         </div>
-                         <div className="flex flex-col gap-1">
-                            <span className="text-[10px] uppercase text-gray-500 font-bold flex items-center gap-1">
-                                <UsersIcon className="w-3 h-3" /> Equipa
-                            </span>
-                            <span className="text-xs text-white font-medium">{lead.employees || "N/A"}</span>
-                         </div>
-                      </div>
-
-                      {lead.secondaryCae && lead.secondaryCae.length > 0 && (
-                          <div className="flex flex-col gap-1 border-t border-gray-700/50 pt-3 mt-1">
-                              <span className="text-[10px] uppercase text-gray-500 font-bold">CAEs Secundários</span>
-                              <div className="flex flex-wrap gap-1">
-                                  {lead.secondaryCae.map((cae, idx) => (
-                                      <span key={idx} className="text-[10px] bg-gray-800 text-gray-300 px-1.5 py-0.5 rounded border border-gray-700 font-mono">
-                                          {cae}
-                                      </span>
-                                  ))}
-                              </div>
-                          </div>
-                      )}
-                   </div>
-                </div>
-
-                {/* Diagnosis */}
-                <div>
-                  <h4 className="text-sm font-bold text-ai-warning uppercase tracking-wider flex items-center gap-2 mb-3">
-                    <Smartphone className="w-4 h-4" /> AI Diagnosis
-                  </h4>
-                  <div className="bg-ai-warning/5 border border-ai-warning/10 p-4 rounded-lg">
-                    <div className="space-y-2">
-                      <ul className="space-y-1">
-                        {lead.proposal?.problems.map((prob, i) => (
-                          <li key={i} className="text-sm text-gray-400 flex items-start gap-2">
-                             <span className="text-red-400 mt-1">x</span> {prob}
-                          </li>
+                 {lead.businessHours && lead.businessHours.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-500 uppercase mb-2 flex items-center gap-2">
+                        <Clock className="w-3 h-3" /> Horário de Funcionamento
+                    </h4>
+                    <div className="text-xs text-gray-400 bg-gray-800/50 p-2 rounded border border-gray-800">
+                        {lead.businessHours.map((hour, i) => (
+                            <div key={i}>{hour}</div>
                         ))}
-                      </ul>
                     </div>
                   </div>
-                </div>
-              </div>
-
-              {/* Right Column: Proposal */}
-              <div className="space-y-6">
-                <div>
-                  <h4 className="text-sm font-bold text-ai-accent uppercase tracking-wider flex items-center gap-2 mb-3">
-                    <FileText className="w-4 h-4" /> Commercial Proposal (Module 4)
-                  </h4>
-                  
-                  <div className="space-y-4">
-                    <div className="bg-ai-dark p-4 rounded border border-gray-700">
-                      <p className="text-xs font-bold text-ai-success uppercase mb-2">🚀 Proposed Solution</p>
-                      <ul className="space-y-2">
-                        {lead.proposal?.solutionFeatures.map((feat, idx) => (
-                           <li key={idx} className="text-sm text-gray-300 flex items-start gap-2">
-                             <CheckCircle className="w-4 h-4 text-ai-success shrink-0" /> {feat}
-                           </li>
-                        ))}
-                      </ul>
-                    </div>
-
-                    <div className="bg-gradient-to-r from-ai-card to-ai-dark p-3 rounded border border-gray-700">
-                        <p className="text-xs text-gray-500 mb-1">Visual Identity</p>
-                        <p className="text-sm italic text-gray-300">"{lead.proposal?.brandingSuggestion}"</p>
-                    </div>
-
-                  </div>
-                </div>
-              </div>
+                )}
             </div>
-          ) : (
-            // Email Tab
-            <div className="max-w-3xl mx-auto">
-                {lead.generatedEmail ? (
-                    <div className="space-y-4">
-                        <div className="bg-ai-dark border border-gray-700 rounded-lg p-6">
-                            <div className="mb-4 pb-4 border-b border-gray-800">
-                                <span className="text-xs text-gray-500 font-bold uppercase">Subject</span>
-                                <p className="text-lg font-medium text-white mt-1">{lead.generatedEmail.subject}</p>
-                            </div>
-                            <div className="whitespace-pre-wrap text-gray-300 text-sm leading-relaxed font-sans">
-                                {lead.generatedEmail.body}
-                            </div>
+
+            {/* Right Column: Visual, Potential & Reviews */}
+            <div className="space-y-6">
+                <div>
+                    <h4 className="text-xs font-bold text-purple-400 uppercase mb-3">Análise de Potencial</h4>
+                    <div className="space-y-3 text-sm">
+                         {/* Classification Reasoning */}
+                         <div className={`p-3 rounded border ${lead.potential === 'Hot' ? 'bg-red-900/10 border-red-500/30 text-red-300' : lead.potential === 'Cold' ? 'bg-blue-900/10 border-blue-500/30 text-blue-300' : 'bg-yellow-900/10 border-yellow-500/30 text-yellow-300'}`}>
+                            <p className="text-xs font-bold uppercase mb-1 flex items-center gap-2">
+                                <Bot className="w-3 h-3" /> Motivo da Classificação:
+                            </p>
+                            <p className="italic">"{lead.potentialReasoning}"</p>
                         </div>
-                        <div className="flex justify-end gap-3">
-                            <button 
-                                onClick={copyEmail}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors"
-                            >
-                                {emailCopied ? <CheckCircle className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}
-                                {emailCopied ? "Copied" : "Copy to Clipboard"}
-                            </button>
-                            <a 
-                                href={`mailto:${lead.email}?subject=${encodeURIComponent(lead.generatedEmail.subject)}&body=${encodeURIComponent(lead.generatedEmail.body)}`}
-                                className="flex items-center gap-2 px-4 py-2 bg-ai-accent hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-blue-900/20"
-                            >
-                                <Send className="w-4 h-4" />
-                                Send via Email Client
-                            </a>
-                        </div>
+
+                        {lead.storefront.analyzed ? (
+                           <div className="space-y-2 mt-2">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="bg-gray-800 p-2 rounded">
+                                        <span className="block text-[10px] text-gray-500 uppercase">Estado Placa</span>
+                                        <span className="font-bold text-white">{lead.storefront.signageCondition}</span>
+                                    </div>
+                                    <div className="bg-gray-800 p-2 rounded">
+                                        <span className="block text-[10px] text-gray-500 uppercase">Upgrade LED?</span>
+                                        <span className={`font-bold ${lead.storefront.needsLedUpgrade ? 'text-green-400' : 'text-red-400'}`}>
+                                            {lead.storefront.needsLedUpgrade ? "SIM (Prioridade)" : "Não urgente"}
+                                        </span>
+                                    </div>
+                                </div>
+                                {/* Address Found */}
+                                {lead.storefront.address && (
+                                    <div className="bg-gray-800/50 p-2 rounded border border-gray-700">
+                                        <span className="block text-[10px] text-gray-500 uppercase flex items-center gap-1">
+                                            <MapPin className="w-3 h-3" /> Endereço Visual
+                                        </span>
+                                        <span className="text-xs text-gray-300">{lead.storefront.address}</span>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                             <p className="text-gray-500 text-sm italic">Clique em "Fachada" para analisar o potencial físico.</p>
+                        )}
                     </div>
-                ) : (
-                    <div className="text-center py-12">
-                        <p className="text-gray-500">Generating email strategy...</p>
+                </div>
+
+                {lead.reviewsList && lead.reviewsList.length > 0 && (
+                    <div>
+                         <h4 className="text-xs font-bold text-yellow-500 uppercase mb-2 flex items-center gap-2">
+                            <MessageSquare className="w-3 h-3" /> Reviews Recentes
+                        </h4>
+                        <div className="space-y-2">
+                            {lead.reviewsList.slice(0, 2).map((review, i) => (
+                                <div key={i} className="bg-gray-800 p-2 rounded border border-gray-700 text-xs">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="font-bold text-white">{review.author}</span>
+                                        <span className="flex text-yellow-400"><Star className="w-3 h-3 fill-yellow-400"/> {review.rating}</span>
+                                    </div>
+                                    <p className="text-gray-400 italic line-clamp-2">"{review.text}"</p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
-          )}
-          </div>
         </div>
       )}
     </div>
   );
 };
 
-const LeadResults: React.FC<LeadResultsProps> = ({ leads }) => {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'qualified' | 'discarded'>('all');
-
-  const filteredLeads = useMemo(() => {
-    return leads.filter(lead => {
-      if (statusFilter === 'qualified' && lead.status === 'discarded') return false;
-      if (statusFilter === 'discarded' && lead.status !== 'discarded') return false;
-      return true;
-    });
-  }, [leads, statusFilter]);
-
-  if (leads.length === 0) return null;
-
+const LeadResults: React.FC<LeadResultsProps> = ({ leads, onInvestigate, onGenerateProposal, onAskAI, onGenerateSite }) => {
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-800 pb-4">
-        <div className="flex items-center gap-2">
-          <Database className="w-5 h-5 text-ai-accent" />
-          <h2 className="text-xl font-bold text-white">Prospects</h2>
-          <span className="bg-gray-800 text-gray-300 text-xs font-mono font-bold px-2 py-1 rounded">
-            {filteredLeads.length}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-4">
-            <button 
-              onClick={() => setStatusFilter('all')}
-              className={`text-xs font-medium ${statusFilter === 'all' ? 'text-white' : 'text-gray-500'}`}
-            >
-              All
-            </button>
-            <button 
-              onClick={() => setStatusFilter('qualified')}
-              className={`text-xs font-medium ${statusFilter === 'qualified' ? 'text-ai-success' : 'text-gray-500'}`}
-            >
-              Qualified
-            </button>
-             <button 
-              onClick={() => setStatusFilter('discarded')}
-              className={`text-xs font-medium ${statusFilter === 'discarded' ? 'text-ai-danger' : 'text-gray-500'}`}
-            >
-              Discarded
-            </button>
-        </div>
-      </div>
-      
-      <div className="grid gap-4">
-        {filteredLeads.map((lead) => (
-            <LeadCard key={lead.id} lead={lead} />
-        ))}
-      </div>
+    <div className="space-y-4">
+      {leads.map(lead => (
+        <LeadCard 
+            key={lead.id} 
+            lead={lead} 
+            onInvestigate={onInvestigate} 
+            onGenerateProposal={onGenerateProposal}
+            onAskAI={onAskAI}
+            onGenerateSite={onGenerateSite}
+        />
+      ))}
     </div>
   );
 };
