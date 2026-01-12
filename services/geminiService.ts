@@ -1,10 +1,19 @@
-import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { Lead, EmailDraft, SmtpConfig, SocialProfile, StorefrontAnalysis, Review, ChatMessage } from '../types';
+import { supabase } from './supabase';
+import { Lead } from '../types';
 
-const getClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key is missing");
-  return new GoogleGenAI({ apiKey });
+export const searchLeadsInLocation = async (
+  location: string,
+  niche: string,
+  aiContext: string,
+  campaignName: string
+): Promise<Partial<Lead>[]> => {
+  const { data, error } = await supabase.functions.invoke(
+    'search-leads-agent',
+    { body: { location, niche, aiContext, campaignName } }
+  );
+
+  if (error) throw error;
+  return data;
 };
 
 const extractJson = (text: string): any => {
