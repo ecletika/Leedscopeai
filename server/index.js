@@ -1,14 +1,10 @@
-const { createClient } = require('@supabase/supabase-js');
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+// server/index.js
 
 const express = require('express');
 const nodemailer = require('nodemailer');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,7 +13,15 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(bodyParser.json());
 
+// Configurar Supabase
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// ====================
 // Endpoint de Teste SMTP
+// ====================
 app.post('/api/test-smtp', async (req, res) => {
   const { config, to } = req.body;
 
@@ -33,32 +37,29 @@ app.post('/api/test-smtp', async (req, res) => {
   log(`User: ${config.user}`);
 
   try {
-    // 1. Criar Transportador
     const transporter = nodemailer.createTransport({
       host: config.host,
       port: parseInt(config.port),
-      secure: config.secure, // true para 465, false para outros (geralmente)
+      secure: config.secure,
       auth: {
         user: config.user,
         pass: config.pass,
       },
       tls: {
-        rejectUnauthorized: false // Ajuda em alguns ambientes de dev, cuidado em prod estrito
+        rejectUnauthorized: false
       }
     });
 
-    // 2. Verificar Conexão
     log('Verifying connection credentials...');
     await transporter.verify();
-    log('Connection Verified! Credentials are valid.');
+    log('Connection Verified!');
 
-    // 3. Enviar Email de Teste
     log(`Sending test email to: ${to}...`);
     const info = await transporter.sendMail({
       from: `"${config.fromName || 'LeadScope Test'}" <${config.fromEmail || config.user}>`,
       to: to,
       subject: 'LeadScope AI - SMTP Configuration Test',
-      text: 'If you are reading this, your SMTP configuration is working perfectly! This is a real email sent from your LeadScope dashboard.',
+      text: 'If you are reading this, your SMTP configuration is working perfectly!',
       html: `
         <div style="font-family: sans-serif; padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
           <h2 style="color: #10b981;">Connection Successful! 🚀</h2>
@@ -77,22 +78,20 @@ app.post('/api/test-smtp', async (req, res) => {
     log('STATUS: SUCCESS');
 
     res.json({ success: true, log: logEntries.join('\n') });
-
   } catch (error) {
     console.error('SMTP Error:', error);
     log(`ERROR: ${error.message}`);
     if (error.code === 'EAUTH') log('Check your username and password (or App Password).');
     if (error.code === 'ESOCKET') log('Check host address and port.');
     log('STATUS: FAILED');
-    
+
     res.status(500).json({ success: false, log: logEntries.join('\n') });
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`LeadScope Backend running on port ${PORT}`);
-});
-// Endpoint de login
+// ====================
+// Endpoint de Login Supabase
+// ====================
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -110,10 +109,16 @@ app.post('/api/login', async (req, res) => {
       return res.status(401).json({ success: false, message: error.message });
     }
 
-    // Login bem-sucedido
     res.json({ success: true, user: data.user });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ success: false, message: 'Erro no servidor.' });
   }
+});
+
+// ====================
+// Inicializar servidor
+// ====================
+app.listen(PORT, () => {
+  console.log(`LeadScope Backend running on port ${PORT}`);
 });
