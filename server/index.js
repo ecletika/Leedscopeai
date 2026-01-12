@@ -92,3 +92,28 @@ app.post('/api/test-smtp', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`LeadScope Backend running on port ${PORT}`);
 });
+// Endpoint de login
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: 'Email e senha são obrigatórios.' });
+  }
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return res.status(401).json({ success: false, message: error.message });
+    }
+
+    // Login bem-sucedido
+    res.json({ success: true, user: data.user });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ success: false, message: 'Erro no servidor.' });
+  }
+});
