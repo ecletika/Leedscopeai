@@ -1,34 +1,79 @@
 import { supabase } from './supabase';
 import { Lead } from '../types';
 
-// Função já existente para pesquisa de leads
+// Pesquisa de leads
 export const searchLeadsInLocation = async (
   location: string,
   niche: string,
   aiContext: string,
   campaignName: string
 ): Promise<Partial<Lead>[]> => {
-  const { data, error } = await supabase.functions.invoke(
-    'search-leads-agent',
-    { body: { location, niche, aiContext, campaignName } }
-  );
-
+  const { data, error } = await supabase.functions.invoke('search-leads-agent', {
+    body: { location, niche, aiContext, campaignName }
+  });
   if (error) throw error;
   return data;
 };
 
-// Função do Gemini Worker
-export async function generateText(prompt: string) {
-  const res = await fetch("https://gemini-api-worker.YOURDOMAIN.workers.dev", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt })
+// Análise e proposta
+export const analyzeAndGenerateProposal = async (lead: Lead): Promise<Lead> => {
+  const { data, error } = await supabase.functions.invoke('analyze-and-generate-proposal', {
+    body: lead
   });
+  if (error) throw error;
+  return data as Lead;
+};
 
-  if (!res.ok) {
-    throw new Error("Erro ao gerar texto do Worker");
-  }
+// Geração de email de outreach
+export const generateOutreachEmail = async (lead: Lead): Promise<string> => {
+  const { data, error } = await supabase.functions.invoke('generate-outreach-email', {
+    body: lead
+  });
+  if (error) throw error;
+  return data as string;
+};
 
-  const data = await res.json();
+// Investigação da fachada / storefront
+export const runStorefrontInvestigation = async (lead: Lead): Promise<{ analysis: any; leadUpdates: Partial<Lead> }> => {
+  const { data, error } = await supabase.functions.invoke('storefront-investigation', {
+    body: lead
+  });
+  if (error) throw error;
   return data;
-}
+};
+
+// Proposta comercial completa
+export const generateCommercialProposal = async (lead: Lead): Promise<string> => {
+  const { data, error } = await supabase.functions.invoke('generate-commercial-proposal', {
+    body: lead
+  });
+  if (error) throw error;
+  return data as string;
+};
+
+// Pergunta AI para lead
+export const askLeadQuestion = async (lead: Lead, question: string, history: any[]): Promise<string> => {
+  const { data, error } = await supabase.functions.invoke('ask-lead-question', {
+    body: { lead, question, history }
+  });
+  if (error) throw error;
+  return data as string;
+};
+
+// Geração de código do website
+export const generateWebsiteCode = async (lead: Lead): Promise<string> => {
+  const { data, error } = await supabase.functions.invoke('generate-website-code', {
+    body: lead
+  });
+  if (error) throw error;
+  return data as string;
+};
+
+// Refinar código existente do website
+export const refineWebsiteCode = async (existingCode: string, instructions: string): Promise<string> => {
+  const { data, error } = await supabase.functions.invoke('refine-website-code', {
+    body: { existingCode, instructions }
+  });
+  if (error) throw error;
+  return data as string;
+};
