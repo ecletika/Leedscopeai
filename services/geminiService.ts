@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 import { Lead } from '../types';
 
+// --- Leads / Prospeção ---
+
 // Pesquisa de leads
 export const searchLeadsInLocation = async (
   location: string,
@@ -15,7 +17,7 @@ export const searchLeadsInLocation = async (
   return data;
 };
 
-// Análise e proposta
+// Análise e proposta inicial
 export const analyzeAndGenerateProposal = async (lead: Lead): Promise<Lead> => {
   const { data, error } = await supabase.functions.invoke('analyze-and-generate-proposal', {
     body: lead
@@ -42,7 +44,7 @@ export const runStorefrontInvestigation = async (lead: Lead): Promise<{ analysis
   return data;
 };
 
-// Proposta comercial completa
+// Geração de proposta comercial completa
 export const generateCommercialProposal = async (lead: Lead): Promise<string> => {
   const { data, error } = await supabase.functions.invoke('generate-commercial-proposal', {
     body: lead
@@ -59,6 +61,8 @@ export const askLeadQuestion = async (lead: Lead, question: string, history: any
   if (error) throw error;
   return data as string;
 };
+
+// --- Website Generation / Refinement ---
 
 // Geração de código do website
 export const generateWebsiteCode = async (lead: Lead): Promise<string> => {
