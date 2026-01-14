@@ -1,6 +1,9 @@
 import { supabase } from './supabase';
 import { Lead } from '../types';
 
+// URL do seu projeto Supabase
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://kqpdhmamwljpjozhcivy.supabase.co";
+
 // URL do seu Worker externo
 const WORKER_URL = "https://gemini-api-worker.mauricio-junior.workers.dev";
 
@@ -28,12 +31,11 @@ async function invokeEdgeFunction(name: string, body: any = {}) {
 
   if (!token) throw new Error('Usuário não está logado');
 
-  // Usa URL do projeto Supabase a partir das variáveis de ambiente
-  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`, // JWT enviado
+      'Authorization': `Bearer ${token}`, // JWT enviado
     },
     body: JSON.stringify(body),
   });
