@@ -1,9 +1,10 @@
 import { supabase } from './supabase';
 import { Lead } from '../types';
 
-// URL do seu Worker
+// URL do seu Worker externo
 const WORKER_URL = "https://gemini-api-worker.mauricio-junior.workers.dev";
 
+// --- Worker externo ---
 // Função genérica para chamar o Worker
 async function callWorker(promptOrData: any) {
   const res = await fetch(WORKER_URL, {
@@ -16,30 +17,26 @@ async function callWorker(promptOrData: any) {
     throw new Error(`Erro ao chamar Worker: ${res.statusText}`);
   }
 
-  const data = await res.json();
-  return data;
+  return res.json();
 }
 
-// --- Helper: invoca Edge Function com JWT ---
+// --- Helper: invoca Edge Function Supabase com JWT ---
 async function invokeEdgeFunction(name: string, body: any = {}) {
+  // Pega sessão atual de forma assíncrona
   const { data: sessionData } = await supabase.auth.getSession();
   const token = sessionData?.session?.access_token;
 
-  if (!token) {
-    throw new Error('Usuário não está logado');
-  }
+  if (!token) throw new Error('Usuário não está logado');
 
-  const res = await fetch(
-    `https://kqpdhmamwljpjozhcivy.supabase.co/functions/v1/${name}`,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`, // JWT enviado automaticamente
-      },
-      body: JSON.stringify(body),
-    }
-  );
+  // Usa URL do projeto Supabase a partir das variáveis de ambiente
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${name}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`, // JWT enviado
+    },
+    body: JSON.stringify(body),
+  });
 
   if (!res.ok) {
     const text = await res.text();
@@ -63,43 +60,37 @@ export const searchLeadsInLocation = async (
 
 // Análise e proposta inicial via Worker
 export const analyzeAndGenerateProposal = async (lead: Lead): Promise<Lead> => {
-  const result = await callWorker({ action: 'analyzeAndGenerateProposal', lead });
-  return result as Lead;
+  return callWorker({ action: 'analyzeAndGenerateProposal', lead }) as Promise<Lead>;
 };
 
 // Geração de email de outreach via Worker
 export const generateOutreachEmail = async (lead: Lead): Promise<string> => {
-  const result = await callWorker({ action: 'generateOutreachEmail', lead });
-  return result as string;
+  return callWorker({ action: 'generateOutreachEmail', lead }) as Promise<string>;
 };
 
-// Investigação da fachada / storefront via Supabase Edge Function
+// Investigação da fachada / storefront via Edge Function
 export const runStorefrontInvestigation = async (lead: Lead): Promise<{ analysis: any; leadUpdates: Partial<Lead> }> => {
   return invokeEdgeFunction('storefront-investigation', lead);
 };
 
 // Geração de proposta comercial completa via Worker
 export const generateCommercialProposal = async (lead: Lead): Promise<string> => {
-  const result = await callWorker({ action: 'generateCommercialProposal', lead });
-  return result as string;
+  return callWorker({ action: 'generateCommercialProposal', lead }) as Promise<string>;
 };
 
 // Pergunta AI para lead via Worker
 export const askLeadQuestion = async (lead: Lead, question: string, history: any[]): Promise<string> => {
-  const result = await callWorker({ action: 'askLeadQuestion', lead, question, history });
-  return result as string;
+  return callWorker({ action: 'askLeadQuestion', lead, question, history }) as Promise<string>;
 };
 
 // --- Website Generation / Refinement ---
 
 // Geração de código do website via Worker
 export const generateWebsiteCode = async (lead: Lead): Promise<string> => {
-  const result = await callWorker({ action: 'generateWebsiteCode', lead });
-  return result as string;
+  return callWorker({ action: 'generateWebsiteCode', lead }) as Promise<string>;
 };
 
 // Refinar código existente do website via Worker
 export const refineWebsiteCode = async (existingCode: string, instructions: string): Promise<string> => {
-  const result = await callWorker({ action: 'refineWebsiteCode', existingCode, instructions });
-  return result as string;
+  return callWorker({ action: 'refineWebsiteCode', existingCode, instructions }) as Promise<string>;
 };
