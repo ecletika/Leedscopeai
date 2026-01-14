@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import LandingPage from './components/LandingPage'
 import Dashboard from './components/Dashboard'
-import { supabase } from './lib/supabase'
+import { supabase } from './services/supabase'
 import { User } from '@supabase/supabase-js'
 import { Lock, Mail, ArrowRight, AlertCircle, Loader2 } from 'lucide-react'
 
