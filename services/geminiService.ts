@@ -1,4 +1,3 @@
-// services/geminiService.ts
 import { supabase } from './supabase';
 import { Lead } from '../types';
 
@@ -21,6 +20,35 @@ async function callWorker(promptOrData: any) {
   return data;
 }
 
+// --- Helper: invoca Edge Function com JWT ---
+async function invokeEdgeFunction(name: string, body: any = {}) {
+  const { data: sessionData } = await supabase.auth.getSession();
+  const token = sessionData?.session?.access_token;
+
+  if (!token) {
+    throw new Error('Usuário não está logado');
+  }
+
+  const res = await fetch(
+    `https://kqpdhmamwljpjozhcivy.supabase.co/functions/v1/${name}`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`, // JWT enviado automaticamente
+      },
+      body: JSON.stringify(body),
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Edge Function retornou ${res.status}: ${text}`);
+  }
+
+  return res.json();
+}
+
 // --- Leads / Prospeção ---
 
 // Pesquisa de leads
@@ -30,11 +58,7 @@ export const searchLeadsInLocation = async (
   aiContext: string,
   campaignName: string
 ): Promise<Partial<Lead>[]> => {
-  const { data, error } = await supabase.functions.invoke('search-leads-agent', {
-    body: { location, niche, aiContext, campaignName },
-  });
-  if (error) throw error;
-  return data;
+  return invokeEdgeFunction('search-leads-agent', { location, niche, aiContext, campaignName });
 };
 
 // Análise e proposta inicial via Worker
@@ -49,11 +73,9 @@ export const generateOutreachEmail = async (lead: Lead): Promise<string> => {
   return result as string;
 };
 
-// Investigação da fachada / storefront via Supabase
+// Investigação da fachada / storefront via Supabase Edge Function
 export const runStorefrontInvestigation = async (lead: Lead): Promise<{ analysis: any; leadUpdates: Partial<Lead> }> => {
-  const { data, error } = await supabase.functions.invoke('storefront-investigation', { body: lead });
-  if (error) throw error;
-  return data;
+  return invokeEdgeFunction('storefront-investigation', lead);
 };
 
 // Geração de proposta comercial completa via Worker
