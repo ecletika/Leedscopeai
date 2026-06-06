@@ -1,12 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lead, ProcessingStage, User, SmtpConfig, Campaign, PlanDefinition } from '../types';
 import AgentCard from './AgentCard';
 import LeadResults from './LeadResults';
 import ProposalModal from './ProposalModal';
 import AskAIModal from './AskAIModal';
 import CodePreviewModal from './CodePreviewModal';
-import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, History, Edit, CreditCard, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import HotelManagement from './HotelManagement';
+import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot } from 'lucide-react';
 import { searchLeadsInLocation, analyzeAndGenerateProposal, generateOutreachEmail, runStorefrontInvestigation, generateCommercialProposal, askLeadQuestion, generateWebsiteCode, refineWebsiteCode } from '../services/geminiService';
+import { hotelDb } from '../services/hotelDb';
+import { SystemHealth } from './SystemHealth';
 
 const AGENTS = [
   { id: 0, name: 'Líder de Missão', role: 'Orquestrador', icon: 'orchestrator' },
@@ -31,13 +34,13 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'database' | 'agenda' | 'history' | 'admin'>('dashboard');
   
   // Search State
-  const [campaignName, setCampaignName] = useState('');
-  const [location, setLocation] = useState('');
-  const [niche, setNiche] = useState('');
-  const [aiContext, setAiContext] = useState(''); 
+  const [campaignName, setCampaignName] = useState('Hotéis Portugal - Housekeeping');
+  const [location, setLocation] = useState('Lisboa, Porto, Algarve');
+  const [niche, setNiche] = useState('Hotéis');
+  const [aiContext, setAiContext] = useState('Análise de reputação de limpeza e adequabilidade do Sistema de Governança'); 
   const [leadLimit, setLeadLimit] = useState<number>(3); 
 
   const [stage, setStage] = useState<ProcessingStage>('idle');
@@ -47,6 +50,143 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
     0: 'idle', 1: 'idle', 2: 'idle', 9: 'idle', 10: 'idle', 8: 'idle'
   });
   
+  // CRM Database & Agenda states
+  const [savedHotels, setSavedHotels] = useState<Lead[]>([]);
+  const [isHotelModalOpen, setIsHotelModalOpen] = useState(false);
+  const [manualHotel, setManualHotel] = useState<Partial<Lead>>({
+    companyName: '',
+    location: '',
+    website: '',
+    phone: '',
+    email: '',
+    contactPerson: '',
+    contactNotes: '',
+    potential: 'Medium',
+    callbackStatus: 'pending',
+    callbackScheduledAt: ''
+  });
+  const [editingHotel, setEditingHotel] = useState<Lead | null>(null);
+
+  const [isLoadingError, setIsLoadingError] = useState<string | null>(null);
+
+  // Load saved hotels on mount and when changes occur
+  const loadSavedHotels = async () => {
+    try {
+      setIsLoadingError(null);
+      const data = await hotelDb.getAllHotels();
+      setSavedHotels(data);
+    } catch (err: any) {
+      console.error("Erro ao carregar hotéis:", err);
+      setIsLoadingError(`Não foi possível carregar os hotéis da base de dados: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    loadSavedHotels();
+  }, []);
+
+  // Save Lead from active search results campaign directly into the B2B CRM database
+  const handleSaveToDb = async (lead: Lead) => {
+    console.log('--- A tentar salvar hotel no DB ---', lead.companyName);
+    const success = await hotelDb.saveHotel({
+      ...lead,
+      niche: lead.niche || 'Hotelaria',
+      callbackStatus: lead.callbackStatus || 'pending'
+    });
+    if (success) {
+      console.log('--- Hotel salvo com sucesso! ---', lead.companyName);
+      await loadSavedHotels();
+    } else {
+      console.error('--- Falha ao salvar hotel ---', lead.companyName);
+    }
+  };
+
+  // Save manual hotel entry
+  const handleSaveManualHotel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualHotel.companyName) {
+      alert("O nome do hotel é obrigatório.");
+      return;
+    }
+
+    const fullHotelLead: Lead = {
+      id: crypto.randomUUID(),
+      companyName: manualHotel.companyName,
+      location: manualHotel.location || "Portugal",
+      niche: "Hotelaria",
+      website: manualHotel.website || undefined,
+      phone: manualHotel.phone || undefined,
+      allPhones: manualHotel.phone ? [manualHotel.phone] : [],
+      email: manualHotel.email || undefined,
+      contactPerson: manualHotel.contactPerson || undefined,
+      contactNotes: manualHotel.contactNotes || undefined,
+      callbackScheduledAt: manualHotel.callbackScheduledAt || undefined,
+      callbackStatus: (manualHotel.callbackStatus as any) || 'pending',
+      potential: (manualHotel.potential as any) || 'Medium',
+      mapsRating: 0,
+      mapsReviews: 0,
+      socials: [],
+      nif: '',
+      cae: '',
+      hasWebsite: !!manualHotel.website,
+      isProfessionalEmail: false,
+      websiteScore: manualHotel.website ? 8 : 0,
+      status: 'completed',
+      potentialReasoning: 'Registo manual no CRM.',
+      storefront: {
+        analyzed: true,
+        signageCondition: 'Unknown',
+        visualAppeal: 'Medium',
+        needsLedUpgrade: false,
+        description: 'Parâmetro de estrutura criado manualmente.',
+        address: manualHotel.location || "Portugal"
+      },
+      diagnosis: manualHotel.contactNotes || "Hotel registado manualmente.",
+      proposal: null,
+      emailSequence: [],
+      generatedSiteCode: null
+    };
+
+    const success = await hotelDb.saveHotel(fullHotelLead);
+    if (success) {
+      await loadSavedHotels();
+      setIsHotelModalOpen(false);
+      setManualHotel({
+        companyName: '',
+        location: '',
+        website: '',
+        phone: '',
+        email: '',
+        contactPerson: '',
+        contactNotes: '',
+        potential: 'Medium',
+        callbackStatus: 'pending',
+        callbackScheduledAt: ''
+      });
+    }
+  };
+
+  // Delete hotel from Database
+  const handleDeleteHotel = async (id: string, name: string) => {
+    if (confirm(`Tem a certeza que deseja excluir "${name}" do CRM de Hotéis?`)) {
+      await hotelDb.deleteHotel(id, name);
+      await loadSavedHotels();
+    }
+  };
+
+  // Save edited hotel properties (notes / callback dates)
+  const handleSaveEditedHotelCrm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingHotel) return;
+
+    // Synchronize direct updates
+    const success = await hotelDb.saveHotel(editingHotel);
+    if (success) {
+      await loadSavedHotels();
+      setEditingHotel(null);
+    }
+  };
+
   // Modals State
   const [activeLeadForProposal, setActiveLeadForProposal] = useState<Lead | null>(null);
   const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
@@ -158,10 +298,11 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
       
       setAllUsers(allUsers.map(u => u.id === currentUser.id ? finalUser : u));
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       setStage('finished');
-      updateAgent(0, 'error', 'Erro no sistema.');
+      const apiErrorMsg = error instanceof Error ? error.message : 'Erro genérico ou falha na rede de dados.';
+      updateAgent(0, 'error', `Falha na Campanha: ${apiErrorMsg}`);
     }
   };
 
@@ -336,58 +477,91 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
   return (
     <div className="flex h-screen bg-ai-dark text-white overflow-hidden font-sans">
-      <aside className="w-64 border-r border-gray-800 bg-ai-dark/50 hidden md:flex flex-col p-4">
+      <aside className="w-64 border-r border-gray-800 bg-ai-dark/50 hidden md:flex flex-col p-4 shrink-0">
         <div className="flex items-center gap-2 mb-8 px-2">
-            <div className="w-8 h-8 bg-ai-accent rounded-lg flex items-center justify-center">
-              <Target className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
+              <Activity className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold">LeadScope LEDs</span>
+            <div className="flex flex-col">
+              <span className="font-bold text-sm tracking-tight text-white">LeadScope</span>
+              <span className="text-[10px] text-emerald-400 font-mono tracking-wider font-bold">HOUSEKEEPING</span>
+            </div>
         </div>
-        <nav className="space-y-2">
+        <nav className="space-y-1.5 flex-1">
             <button 
                 onClick={() => setActiveTab('dashboard')} 
-                className={`w-full text-left px-4 py-2 rounded text-sm font-bold flex items-center gap-2 ${activeTab === 'dashboard' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'}`}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'dashboard' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
             >
-                <Database className="w-4 h-4" /> Nova Campanha
+                <Search className="w-4 h-4" /> Nova Prospeção
+            </button>
+
+            <button 
+                onClick={() => setActiveTab('database')} 
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'database' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <Database className="w-4 h-4" /> Base de Dados CRM
+                {savedHotels.length > 0 && (
+                  <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-emerald-600 text-white rounded font-mono font-bold leading-none">
+                    {savedHotels.length}
+                  </span>
+                )}
+            </button>
+
+            <button 
+                onClick={() => setActiveTab('agenda')} 
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'agenda' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <Calendar className="w-4 h-4" /> Agenda de Chamadas
+                {savedHotels.filter(h => h.callbackScheduledAt && h.callbackStatus === 'pending').length > 0 && (
+                  <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-rose-600 text-white rounded font-mono font-bold leading-none">
+                    {savedHotels.filter(h => h.callbackScheduledAt && h.callbackStatus === 'pending').length}
+                  </span>
+                )}
             </button>
             
             <button 
                 onClick={() => { setActiveTab('history'); setSelectedCampaign(null); }} 
-                className={`w-full text-left px-4 py-2 rounded text-sm font-bold flex items-center gap-2 ${activeTab === 'history' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'}`}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'history' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
             >
-                <History className="w-4 h-4" /> Histórico
+                <History className="w-4 h-4" /> Histórico Campanhas
             </button>
 
             {currentUser.role === 'admin' && (
                 <button 
                     onClick={() => setActiveTab('admin')} 
-                    className={`w-full text-left px-4 py-2 rounded text-sm font-bold flex items-center gap-2 ${activeTab === 'admin' ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white'}`}
+                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'admin' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
                 >
-                    <UserCog className="w-4 h-4" /> Admin
+                    <UserCog className="w-4 h-4" /> Admin Console
                 </button>
             )}
 
-            <button onClick={onLogout} className="w-full text-left px-4 py-2 text-gray-400 hover:text-white text-sm flex items-center gap-2 mt-auto">
-                <LogOut className="w-4 h-4" /> Sair
+            <button onClick={onLogout} className="w-full text-left px-4.5 py-2.5 text-gray-500 hover:text-rose-400 text-xs font-bold flex items-center gap-3 mt-12 border border-transparent">
+                <LogOut className="w-4 h-4" /> Terminar Sessão
             </button>
         </nav>
+
+        <div className="mt-auto pt-4 border-t border-gray-800/50">
+            <SystemHealth compact={true} />
+        </div>
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-ai-dark shrink-0">
-            <h1 className="font-bold">
-                {activeTab === 'dashboard' && 'Nova Campanha de Prospeção'}
-                {activeTab === 'history' && 'Histórico de Campanhas'}
-                {activeTab === 'admin' && 'Gestão de Utilizadores'}
+            <h1 className="font-bold text-white tracking-tight flex items-center gap-2">
+                {activeTab === 'dashboard' && 'Pesquisa e Análise de Hotéis'}
+                {activeTab === 'database' && 'Base de Dados de Hotéis & CRM'}
+                {activeTab === 'agenda' && 'Agenda para Voltar Contactos (Callbacks)'}
+                {activeTab === 'history' && 'Histórico de Pesquisas'}
+                {activeTab === 'admin' && 'Gestão Administrativa'}
             </h1>
             <div className="flex items-center gap-4 text-sm">
                 <div className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-full flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-ai-accent" />
-                    <span className="font-bold">{currentUser.credits}</span> 
+                    <CreditCard className="w-4 h-4 text-emerald-400" />
+                    <span className="font-bold text-white">{currentUser.credits}</span> 
                     <span className="text-gray-400 text-xs">créditos</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-400">
-                    <UserIcon className="w-4 h-4" /> {currentUser.name}
+                <div className="flex items-center gap-2 text-gray-400 text-xs font-mono">
+                    <UserIcon className="w-3.5 h-3.5 text-emerald-500" /> {currentUser.name} ({currentUser.role})
                 </div>
             </div>
         </header>
@@ -504,9 +678,360 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                                 onGenerateProposal={handleOpenProposal}
                                 onAskAI={handleOpenChat}
                                 onGenerateSite={handleGenerateSite}
+                                onSaveToDb={handleSaveToDb}
+                                savedLeadNames={savedHotels.map(h => h.companyName.toLowerCase().trim())}
                             />
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* --- BASE DE DADOS (CRM) VIEW --- */}
+            {activeTab === 'database' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    {isLoadingError && (
+                        <div className="p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-lg text-xs font-bold flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4" /> {isLoadingError}
+                        </div>
+                    )}
+                    <HotelManagement 
+                        onSelectProposal={handleOpenProposal}
+                        onSelectChat={handleOpenChat}
+                    />
+                </div>
+            )}
+
+            {/* --- AGENDA (CALLBACKS) VIEW --- */}
+            {activeTab === 'agenda' && (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                                <Calendar className="text-rose-500 w-5 h-5 animate-pulse" /> Agenda de Chamadas de Retorno
+                            </h2>
+                            <p className="text-xs text-gray-400 mt-1">Efetue e acompanhe chamadas de seguimento programadas no CRM.</p>
+                        </div>
+                    </div>
+
+                    {/* Scheduler Queue Layout */}
+                    {savedHotels.filter(h => h.callbackScheduledAt).length === 0 ? (
+                        <div className="bg-ai-card border border-gray-800 rounded-xl p-12 text-center text-gray-500">
+                            <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                            <h3 className="font-bold text-white text-base">Nenhuma chamada agendada na agenda</h3>
+                            <p className="text-xs text-gray-400 max-w-sm mx-auto mt-1">Vá para a <strong>Base de Dados CRM</strong>, clique em "Registar Conversa" em qualquer hotel e programe um dia e hora de retorno!</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {savedHotels
+                                .filter(h => h.callbackScheduledAt)
+                                .sort((a,b) => new Date(a.callbackScheduledAt!).getTime() - new Date(b.callbackScheduledAt!).getTime())
+                                .map(hotel => {
+                                    const isCompleted = hotel.callbackStatus === 'completed';
+                                    const isCanceled = hotel.callbackStatus === 'canceled';
+                                    const callbackTime = new Date(hotel.callbackScheduledAt!).getTime();
+                                    const rightNow = Date.now();
+                                    const isToday = new Date(hotel.callbackScheduledAt!).toDateString() === new Date().toDateString();
+                                    const isPast = callbackTime < rightNow && !isCompleted && !isCanceled;
+
+                                    return (
+                                        <div key={hotel.id} className={`bg-ai-card border rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all ${
+                                          isCompleted ? 'border-gray-800 opacity-60' : 
+                                          isCanceled ? 'border-gray-800/40 opacity-40 line-through' :
+                                          isPast ? 'border-rose-500/50 shadow-lg shadow-rose-950/10' :
+                                          isToday ? 'border-amber-500/50 shadow-lg shadow-amber-950/10' :
+                                          'border-gray-800'
+                                        }`}>
+                                            {/* Urgency indicators left column */}
+                                            <div className="flex-1 min-w-[300px]">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                                      isCompleted ? 'bg-gray-800 text-gray-400' :
+                                                      isCanceled ? 'bg-gray-800 text-gray-500' :
+                                                      isPast ? 'bg-rose-500 text-white' :
+                                                      isToday ? 'bg-amber-500 text-black' :
+                                                      'bg-emerald-600 text-white'
+                                                    }`}>
+                                                        {isCompleted ? 'EFETUADA' :
+                                                         isCanceled ? 'CANCELADA' :
+                                                         isPast ? 'ATRASADA (LIGAR JÁ!)' :
+                                                         isToday ? 'HOJE' : 'AGENDADA'}
+                                                    </span>
+
+                                                    <span className="text-xs text-gray-400 font-mono font-bold">
+                                                        📅 {new Date(hotel.callbackScheduledAt!).toLocaleString('pt-PT')}
+                                                    </span>
+                                                </div>
+
+                                                <h3 className="font-bold text-white text-lg">{hotel.companyName}</h3>
+                                                <p className="text-xs text-gray-400 flex items-center gap-1 mt-1 mb-3">
+                                                    <MapPin className="w-3 h-3 text-gray-500" /> {hotel.location} | Persona: <strong>{hotel.contactPerson || 'Governanta-Geral'}</strong>
+                                                </p>
+
+                                                <div className="bg-gray-850/40 rounded-lg p-3 border border-gray-800/50 text-xs">
+                                                    <strong className="text-gray-400 block mb-1">📋 Notas Atuais / Enunciado Combinado:</strong>
+                                                    <span className="text-gray-300 italic">{hotel.contactNotes || "Nenhuma nota inserida."}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Action right column */}
+                                            <div className="flex md:flex-col items-center md:items-end justify-between shrink-0 gap-4 w-full md:w-auto">
+                                                <div className="text-left md:text-right">
+                                                    <span className="block text-gray-500 text-xs uppercase font-bold">Contacto Principal</span>
+                                                    {hotel.phone ? (
+                                                        <a href={`tel:${hotel.phone}`} className="text-xl font-bold font-mono text-emerald-400 hover:underline">{hotel.phone}</a>
+                                                    ) : (
+                                                        <span className="text-rose-400 font-bold italic">Sem Telefone</span>
+                                                    )}
+                                                </div>
+
+                                                <div className="flex items-center gap-2">
+                                                    {!isCompleted && !isCanceled && (
+                                                      <button 
+                                                          onClick={async () => {
+                                                            await hotelDb.updateCallback(hotel.id, hotel.callbackScheduledAt, 'completed');
+                                                            await loadSavedHotels();
+                                                            alert("Chamada marcada como efetuada com sucesso!");
+                                                          }}
+                                                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all"
+                                                        >
+                                                            <CheckCircle className="w-3.5 h-3.5" /> Marcar Efetuada
+                                                      </button>
+                                                    )}
+
+                                                    <button 
+                                                      onClick={() => setEditingHotel(hotel)}
+                                                      className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs transition-all flex items-center gap-1"
+                                                    >
+                                                        <Edit className="w-3.5 h-3.5" /> Alterar/Reagendar
+                                                    </button>
+
+                                                    {!isCompleted && !isCanceled && (
+                                                        <button 
+                                                          onClick={async () => {
+                                                            await hotelDb.updateCallback(hotel.id, hotel.callbackScheduledAt, 'canceled');
+                                                            await loadSavedHotels();
+                                                          }}
+                                                          className="p-2 bg-gray-800 hover:bg-rose-500/20 text-rose-400 hover:text-white border border-gray-700 rounded-lg transition-all"
+                                                          title="Cancelar Callback"
+                                                        >
+                                                            <X className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* --- ADICIONAR HOTEL MANUALMENTE (MODAL) --- */}
+            {isHotelModalOpen && (
+                <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-ai-card border border-gray-800 rounded-xl max-w-lg w-full overflow-hidden shadow-2xl relative font-sans">
+                        <header className="px-6 py-4 border-b border-gray-800 flex items-center justify-between">
+                            <h2 className="font-bold text-white text-base flex items-center gap-2"><Plus className="text-emerald-500" /> Registar Novo Hotel Manual</h2>
+                            <button onClick={() => setIsHotelModalOpen(false)} className="text-gray-400 hover:text-white">&times;</button>
+                        </header>
+
+                        <form onSubmit={handleSaveManualHotel} className="p-6 space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="md:col-span-2">
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Nome do Hotel/Alojamento <span className="text-red-500">*</span></label>
+                                    <input 
+                                        required
+                                        value={manualHotel.companyName}
+                                        onChange={e => setManualHotel({...manualHotel, companyName: e.target.value})}
+                                        placeholder="Ex: Pestana Palace Hotel"
+                                        className="w-full bg-ai-dark border border-gray-705 border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Localidade/País <span className="text-red-500">*</span></label>
+                                    <input 
+                                        required
+                                        value={manualHotel.location}
+                                        onChange={e => setManualHotel({...manualHotel, location: e.target.value})}
+                                        placeholder="Ex: Lisboa, Portugal"
+                                        className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Website</label>
+                                    <input 
+                                        value={manualHotel.website}
+                                        onChange={e => setManualHotel({...manualHotel, website: e.target.value})}
+                                        placeholder="Ex: pestana.com"
+                                        className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Telefone Principal</label>
+                                    <input 
+                                        value={manualHotel.phone}
+                                        onChange={e => setManualHotel({...manualHotel, phone: e.target.value})}
+                                        placeholder="Ex: +351 213 456 789"
+                                        className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white font-mono placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Email Geral/Comercial</label>
+                                    <input 
+                                        type="email"
+                                        value={manualHotel.email}
+                                        onChange={e => setManualHotel({...manualHotel, email: e.target.value})}
+                                        placeholder="Ex: rececao@hotel.com"
+                                        className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Pessoa de Contacto (Ex: Governança)</label>
+                                    <input 
+                                        value={manualHotel.contactPerson}
+                                        onChange={e => setManualHotel({...manualHotel, contactPerson: e.target.value})}
+                                        placeholder="Ex: Maria Ferreira (Governanta Geral)"
+                                        className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Grau de Prioridade comercial</label>
+                                    <select 
+                                        value={manualHotel.potential}
+                                        onChange={e => setManualHotel({...manualHotel, potential: e.target.value as any})}
+                                        className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    >
+                                        <option value="Hot">🔥 Quente (Gargalo de Limpeza)</option>
+                                        <option value="Medium">⚖️ Média (Potencial de Venda)</option>
+                                        <option value="Cold">❄️ Fria (Operação Confortável)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">O que foi falado/combinado (Notas iniciais)</label>
+                                <textarea 
+                                    rows={3}
+                                    value={manualHotel.contactNotes}
+                                    onChange={e => setManualHotel({...manualHotel, contactNotes: e.target.value})}
+                                    placeholder="Escreva aqui a nota sobre o primeiro contacto, emails enviados, ou feedbacks do hotel..."
+                                    className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                />
+                            </div>
+
+                            <footer className="pt-2 border-t border-gray-800 flex justify-end gap-2">
+                                <button type="button" onClick={() => setIsHotelModalOpen(false)} className="px-4 py-2 text-xs font-bold bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg">Cancelar</button>
+                                <button type="submit" className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">Inserir no CRM</button>
+                            </footer>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* --- REGISTAR CONVERSA E CALLS (MODAL REGISTO / EDIT) --- */}
+            {editingHotel && (
+                <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-ai-card border border-gray-800 rounded-xl max-w-md w-full overflow-hidden shadow-2xl relative font-sans">
+                        <header className="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-emerald-950/20">
+                            <h2 className="font-bold text-white text-base flex items-center gap-2"><Edit className="text-emerald-500" /> Registar Chamada / Conversa</h2>
+                            <button onClick={() => setEditingHotel(null)} className="text-gray-400 hover:text-white">&times;</button>
+                        </header>
+
+                        <form onSubmit={handleSaveEditedHotelCrm} className="p-6 space-y-4">
+                            <div>
+                                <h3 className="text-white font-bold text-lg">{editingHotel.companyName}</h3>
+                                <p className="text-xs text-gray-400">{editingHotel.location}</p>
+                            </div>
+
+                            <div className="space-y-3 p-3 bg-gray-850 rounded-lg border border-gray-800">
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Pessoa de Contacto direta (Governanta Geral / Diretor)</label>
+                                    <input 
+                                        value={editingHotel.contactPerson || ''}
+                                        onChange={e => setEditingHotel({...editingHotel, contactPerson: e.target.value})}
+                                        placeholder="Ex: Paula Albuquerque (Governanta-Geral)"
+                                        className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Telefone Directo de Contacto</label>
+                                    <input 
+                                        value={editingHotel.phone || ''}
+                                        onChange={e => setEditingHotel({...editingHotel, phone: e.target.value})}
+                                        placeholder="Ex: +351 912 345 678"
+                                        className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Grau de Interesse / Prioridade do Hotel</label>
+                                <select 
+                                    value={editingHotel.potential}
+                                    onChange={e => setEditingHotel({...editingHotel, potential: e.target.value as any})}
+                                    className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                >
+                                    <option value="Hot">🔥 Muito Interessado (Problemas na Limpeza)</option>
+                                    <option value="Medium">⚖️ Média / Resposta Neutra</option>
+                                    <option value="Cold">❄️ Fria (Tem outro ou Sem interesse)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">O que foi falado/combinado (Histórico de Chamada) <span className="text-red-500">*</span></label>
+                                <textarea 
+                                    required
+                                    rows={4}
+                                    value={editingHotel.contactNotes || ''}
+                                    onChange={e => setEditingHotel({...editingHotel, contactNotes: e.target.value})}
+                                    placeholder="Ex: Liguei e falei com a Dra. Paula. Mostrou-se muito interessada em eliminar checklists de papel para as camareiras de quarto. Ficámos de enviar vídeo demonstrativo."
+                                    className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2.5 text-xs text-white placeholder-gray-500 outline-none focus:border-emerald-500"
+                                />
+                            </div>
+
+                            <div className="p-3.5 bg-rose-500/5 rounded-lg border border-rose-500/10 space-y-3.5">
+                                <h4 className="text-xs font-bold text-rose-400 flex items-center gap-1.5 uppercase">
+                                    <Calendar className="w-3.5 h-3.5" /> AGENDAR PRÓXIMO CONTACTO (CALLBACK)
+                                </h4>
+                                
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 uppercase mb-1">Data / Hora</label>
+                                        <input 
+                                            type="datetime-local"
+                                            value={editingHotel.callbackScheduledAt || ''}
+                                            onChange={e => setEditingHotel({...editingHotel, callbackScheduledAt: e.target.value})}
+                                            className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-gray-500 uppercase mb-1">Status da Chamada</label>
+                                        <select 
+                                            value={editingHotel.callbackStatus || 'pending'}
+                                            onChange={e => setEditingHotel({...editingHotel, callbackStatus: e.target.value as any})}
+                                            className="w-full bg-ai-dark border border-gray-700 rounded-lg p-2 text-xs text-white outline-none focus:border-rose-500"
+                                        >
+                                            <option value="pending">Pendente (Agendada)</option>
+                                            <option value="completed">Concluída</option>
+                                            <option value="canceled">Cancelada</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <footer className="pt-2 border-t border-gray-800 flex justify-end gap-2">
+                                <button type="button" onClick={() => setEditingHotel(null)} className="px-4 py-2 text-xs font-bold bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg">Fechar</button>
+                                <button type="submit" className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">Guardar Notas</button>
+                            </footer>
+                        </form>
+                    </div>
                 </div>
             )}
 
@@ -579,6 +1104,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                                 onGenerateProposal={handleOpenProposal}
                                 onAskAI={handleOpenChat}
                                 onGenerateSite={handleGenerateSite}
+                                onSaveToDb={handleSaveToDb}
+                                savedLeadNames={savedHotels.map(h => h.companyName.toLowerCase().trim())}
                             />
                         </div>
                     )}
@@ -693,6 +1220,15 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                                 </div>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Gemini API Diagnostics & System Health */}
+                    <div className="bg-ai-card border border-gray-800 rounded-xl p-6">
+                        <div className="flex items-center gap-2 mb-5">
+                            <Server className="w-5 h-5 text-ai-accent" />
+                            <h2 className="text-lg font-bold text-white">Estado & Diagnóstico da API Gemini</h2>
+                        </div>
+                        <SystemHealth />
                     </div>
                 </div>
             )}

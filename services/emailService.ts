@@ -1,7 +1,7 @@
 import { SmtpConfig } from '../types';
 
-// URL do Backend (ajuste conforme necessário para produção, ex: https://api.seudominio.com)
-const API_URL = 'http://localhost:3001';
+// URL do Backend (ajustado dinamicamente para usar a mesma origem)
+const API_URL = '';
 
 export interface SmtpTestResult {
   success: boolean;

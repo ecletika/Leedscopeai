@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Lead } from '../types';
-import { ChevronDown, ChevronUp, Globe, Mail, Phone, ExternalLink, Smartphone, AlertTriangle, Eye, Video, Instagram, Facebook, Linkedin, Youtube, CheckCircle, Flame, Snowflake, Scale, ScanEye, Star, Clock, Tag, MessageSquare, MapPin, FileText, Bot, Briefcase, Code, Share2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Globe, Mail, Phone, ExternalLink, Smartphone, AlertTriangle, Eye, Video, Instagram, Facebook, Linkedin, Youtube, CheckCircle, Flame, Snowflake, Scale, ScanEye, Star, Clock, Tag, MessageSquare, MapPin, FileText, Bot, Briefcase, Code, Share2, Plus, Database } from 'lucide-react';
 
 interface LeadResultsProps {
   leads: Lead[];
@@ -8,6 +8,8 @@ interface LeadResultsProps {
   onGenerateProposal: (lead: Lead) => void;
   onAskAI: (lead: Lead) => void;
   onGenerateSite: (lead: Lead) => void;
+  onSaveToDb?: (lead: Lead) => void;
+  savedLeadNames?: string[];
 }
 
 const PotentialBadge: React.FC<{ potential: 'Hot' | 'Medium' | 'Cold' }> = ({ potential }) => {
@@ -42,8 +44,10 @@ const LeadCard: React.FC<{
     onInvestigate: (id: string) => void,
     onGenerateProposal: (lead: Lead) => void,
     onAskAI: (lead: Lead) => void,
-    onGenerateSite: (lead: Lead) => void
-}> = ({ lead, onInvestigate, onGenerateProposal, onAskAI, onGenerateSite }) => {
+    onGenerateSite: (lead: Lead) => void,
+    onSaveToDb?: (lead: Lead) => void,
+    isSaved?: boolean
+}> = ({ lead, onInvestigate, onGenerateProposal, onAskAI, onGenerateSite, onSaveToDb, isSaved }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -80,6 +84,22 @@ const LeadCard: React.FC<{
         </div>
 
         <div className="flex items-center gap-3">
+             {/* CRM Sync Button */}
+             {onSaveToDb && (
+                 <button 
+                    onClick={(e) => { e.stopPropagation(); onSaveToDb(lead); }}
+                    className={`p-2 border rounded-lg transition-all flex items-center justify-center ${
+                      isSaved 
+                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                        : 'bg-gray-850 hover:bg-emerald-600/30 text-emerald-500 hover:text-white border-gray-700'
+                    }`}
+                    title={isSaved ? "Salvo no CRM" : "Adicionar à Base de Dados"}
+                    disabled={isSaved}
+                 >
+                    {isSaved ? <CheckCircle className="w-4 h-4 text-emerald-400 animate-pulse" /> : <Database className="w-4 h-4 text-emerald-500 hover:text-white" />}
+                 </button>
+             )}
+
              {/* New Action Buttons */}
              <button 
                 onClick={(e) => { e.stopPropagation(); onAskAI(lead); }}
@@ -262,19 +282,24 @@ const LeadCard: React.FC<{
   );
 };
 
-const LeadResults: React.FC<LeadResultsProps> = ({ leads, onInvestigate, onGenerateProposal, onAskAI, onGenerateSite }) => {
+const LeadResults: React.FC<LeadResultsProps> = ({ leads, onInvestigate, onGenerateProposal, onAskAI, onGenerateSite, onSaveToDb, savedLeadNames }) => {
   return (
     <div className="space-y-4">
-      {leads.map(lead => (
-        <LeadCard 
-            key={lead.id} 
-            lead={lead} 
-            onInvestigate={onInvestigate} 
-            onGenerateProposal={onGenerateProposal}
-            onAskAI={onAskAI}
-            onGenerateSite={onGenerateSite}
-        />
-      ))}
+      {leads.map(lead => {
+        const isSaved = savedLeadNames?.includes(lead.companyName.toLowerCase().trim()) || false;
+        return (
+          <LeadCard 
+              key={lead.id} 
+              lead={lead} 
+              onInvestigate={onInvestigate} 
+              onGenerateProposal={onGenerateProposal}
+              onAskAI={onAskAI}
+              onGenerateSite={onGenerateSite}
+              onSaveToDb={onSaveToDb}
+              isSaved={isSaved}
+          />
+        );
+      })}
     </div>
   );
 };

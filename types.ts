@@ -42,6 +42,10 @@ export interface Lead {
   email?: string;
   phone?: string;
   allPhones: string[]; 
+  contactPerson?: string; // Pessoa de contacto (Ex: Governanta Geral, Gerente)
+  contactNotes?: string;  // Notas do que foi falado/combinado
+  callbackScheduledAt?: string; // Data e hora agendadas para ligar novamente
+  callbackStatus?: 'pending' | 'completed' | 'canceled';
   
   nif?: string;
   cae?: string;
