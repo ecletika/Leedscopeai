@@ -1,4 +1,4 @@
-import { Lead, SmtpConfig, SocialProfile, StorefrontAnalysis, ChatMessage } from '../types';
+import { Lead, SmtpConfig, SocialProfile, StorefrontAnalysis, ChatMessage, CallAnalysis, NextActionType } from '../types';
 
 /**
  * Client-side transparent proxy calling backend-side secured Gemini endpoints.
@@ -6,6 +6,10 @@ import { Lead, SmtpConfig, SocialProfile, StorefrontAnalysis, ChatMessage } from
 
 const formatGeminiError = (errorMsg: string, status?: number): string => {
   const lower = typeof errorMsg === 'string' ? errorMsg.toLowerCase() : '';
+
+  if (lower.includes('gemini_api_key') || lower.includes('não está configurada') || lower.includes('nao esta configurada')) {
+    return errorMsg;
+  }
   
   if (status === 429 || lower.includes('429') || lower.includes('quota') || lower.includes('rate limit') || lower.includes('resource_exhausted')) {
     return "A API do Gemini excedeu o limite de quota gratuita ou de requisições por minuto (Erro 429/Quota Excedida). Por favor, aguarde um momento antes de tentar novamente ou verifique as definições de faturamento da sua chave de API.";
@@ -19,10 +23,12 @@ const formatGeminiError = (errorMsg: string, status?: number): string => {
 };
 
 export const searchLeadsInLocation = async (
-  location: string, 
-  niche: string, 
+  country: string,
+  location: string,
+  niche: string,
   aiContext: string,
-  campaignName: string
+  campaignName: string,
+  excludeNames: string[] = []
 ): Promise<Partial<Lead>[]> => {
   try {
     const response = await fetch('/api/gemini/searchLeads', {
@@ -30,7 +36,7 @@ export const searchLeadsInLocation = async (
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ location, niche, aiContext, campaignName })
+      body: JSON.stringify({ country, location, niche, aiContext, campaignName, excludeNames })
     });
 
     if (!response.ok) {
@@ -155,6 +161,96 @@ export const askLeadQuestion = async (
   } catch (error: any) {
     console.error("error inside askLeadQuestion:", error);
     return `Erro ao processar a pergunta: ${formatGeminiError(error.message)}`;
+  }
+};
+
+const VALID_NEXT_ACTIONS: NextActionType[] = ['call', 'demo', 'email', 'whatsapp', 'follow_up', 'proposal', 'none'];
+
+/**
+ * IA Comercial (M30): analisa as notas livres de uma chamada e devolve campos
+ * estruturados (resumo, interesse, decisor, objeccoes, proxima accao, score).
+ * Reusa o endpoint de pergunta livre, pedindo JSON estrito, com parse seguro
+ * e fallback para texto simples quando o modelo nao devolve JSON valido.
+ */
+export const analyzeCallNotes = async (lead: Lead, notes: string): Promise<CallAnalysis> => {
+  const prompt = `Es um assistente comercial do SOL (sistema de housekeeping para hoteis).
+Analisa estas notas de uma chamada de prospeccao e responde APENAS com JSON valido, sem texto antes ou depois, neste formato exato:
+{
+  "summary": "resumo curto da chamada em PT-PT",
+  "executiveSummary": "1-2 frases para a gestao",
+  "interestLevel": "low" | "medium" | "high",
+  "decisionMaker": { "name": "", "role": "", "phone": "", "email": "" },
+  "objections": ["objeccao 1", "objeccao 2"],
+  "nextActionType": "call" | "demo" | "email" | "whatsapp" | "follow_up" | "proposal" | "none",
+  "nextActionDays": 7,
+  "suggestedScore": 0
+}
+Regras: usa strings vazias quando nao houver informacao; suggestedScore entre 0 e 100; nextActionDays e o numero de dias ate ao proximo contacto.
+Notas da chamada: "${notes || 'sem notas'}".`;
+
+  const text = await askLeadQuestion(lead, prompt, []);
+
+  // Extrai o bloco JSON (tolera code fences ou texto extra)
+  const fenced = text.replace(/```json|```/gi, '');
+  const start = fenced.indexOf('{');
+  const end = fenced.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) {
+    return { summary: text, raw: text };
+  }
+
+  try {
+    const parsed = JSON.parse(fenced.slice(start, end + 1));
+    const interest = ['low', 'medium', 'high'].includes(parsed.interestLevel) ? parsed.interestLevel : undefined;
+    const nextActionType: NextActionType | undefined = VALID_NEXT_ACTIONS.includes(parsed.nextActionType) ? parsed.nextActionType : undefined;
+    const dm = parsed.decisionMaker || {};
+    return {
+      summary: parsed.summary || text,
+      executiveSummary: parsed.executiveSummary || undefined,
+      interestLevel: interest,
+      decisionMaker: {
+        name: dm.name || undefined,
+        role: dm.role || undefined,
+        phone: dm.phone || undefined,
+        email: dm.email || undefined
+      },
+      objections: Array.isArray(parsed.objections) ? parsed.objections.filter((o: any) => typeof o === 'string' && o.trim()) : [],
+      nextActionType,
+      nextActionDays: Number.isFinite(Number(parsed.nextActionDays)) ? Number(parsed.nextActionDays) : undefined,
+      suggestedScore: Number.isFinite(Number(parsed.suggestedScore)) ? Math.max(0, Math.min(100, Number(parsed.suggestedScore))) : undefined,
+      raw: text
+    };
+  } catch {
+    return { summary: text, raw: text };
+  }
+};
+
+export interface SimTurn { role: 'seller' | 'customer'; text: string; }
+
+/**
+ * Simulador de chamada com IA (M44). A IA faz role-play de uma persona de cliente
+ * ou avalia o desempenho do vendedor (mode 'evaluate').
+ */
+export const simulateCall = async (
+  persona: string,
+  history: SimTurn[],
+  message: string,
+  mode: 'roleplay' | 'evaluate' = 'roleplay'
+): Promise<string> => {
+  try {
+    const response = await fetch('/api/gemini/simulate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persona, history, message, mode })
+    });
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(formatGeminiError(errData.error || `Server error ${response.status}`, response.status));
+    }
+    const data = await response.json();
+    return data.text || 'Sem resposta.';
+  } catch (error: any) {
+    console.error('simulateCall error:', error);
+    return `Erro na simulacao: ${formatGeminiError(error.message)}`;
   }
 };
 
@@ -283,4 +379,3 @@ export const fetchGeminiHealth = async (runTest = false): Promise<GeminiHealthRe
     };
   }
 };
-

@@ -67,6 +67,25 @@ export const hotelDb = {
         }
 
         if (!error) return true;
+        if (this.isMissingCrmColumnError(error)) {
+          console.warn('Supabase CRM columns are not migrated yet, retrying legacy hotel write:', error);
+          const legacyHotel = this.mapLeadToLegacyDb(hotel);
+
+          if (existing) {
+            const { error: legacyError } = await supabase
+              .from('hotels')
+              .update(legacyHotel)
+              .eq('id', existing.id);
+            if (!legacyError) return true;
+            console.warn('Supabase legacy update error, falling back to localStorage:', legacyError);
+          } else {
+            const { error: legacyError } = await supabase
+              .from('hotels')
+              .insert([legacyHotel]);
+            if (!legacyError) return true;
+            console.warn('Supabase legacy insert error, falling back to localStorage:', legacyError);
+          }
+        }
         console.warn('Supabase write error, falling back to localStorage:', error);
       } catch (err) {
         console.warn('Supabase write failed, falling back to localStorage:', err);
@@ -154,6 +173,43 @@ export const hotelDb = {
       id: lead.id,
       company_name: lead.companyName,
       location: lead.location,
+      city: lead.city || null,
+      country: lead.country || null,
+      niche: lead.niche || 'Hotelaria',
+      segment: lead.segment || null,
+      estimated_rooms: lead.estimatedRooms || null,
+      website: lead.website || null,
+      email: lead.email || null,
+      phone: lead.phone || null,
+      contact_person: lead.contactPerson || null,
+      contact_notes: lead.contactNotes || null,
+      callback_scheduled_at: lead.callbackScheduledAt || null,
+      callback_status: lead.callbackStatus || 'pending',
+      potential: lead.potential || 'Medium',
+      maps_rating: lead.mapsRating || null,
+      maps_reviews: lead.mapsReviews || null,
+      commercial_status: lead.commercialStatus || 'new',
+      responsible_seller_id: lead.responsibleSellerId || null,
+      priority: lead.priority || 'medium',
+      lead_score: lead.leadScore || 0,
+      source: lead.source || null,
+      next_action_type: lead.nextActionType || null,
+      next_action_at: lead.nextActionAt || null,
+      close_reason_id: lead.closeReasonId || null,
+      close_notes: lead.closeNotes || null,
+      do_not_contact: lead.doNotContact || false,
+      last_activity_at: lead.lastActivityAt || null,
+      qualification: lead.qualification || null,
+      followup_sequence: lead.followupSequence || null,
+      created_at: new Date().toISOString()
+    };
+  },
+
+  mapLeadToLegacyDb(lead: Lead) {
+    return {
+      id: lead.id,
+      company_name: lead.companyName,
+      location: lead.location,
       niche: lead.niche || 'Hotelaria',
       website: lead.website || null,
       email: lead.email || null,
@@ -169,6 +225,16 @@ export const hotelDb = {
     };
   },
 
+  isMissingCrmColumnError(error: any): boolean {
+    const message = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+    return (
+      error?.code === 'PGRST204' ||
+      error?.code === '42703' ||
+      message.includes('column') ||
+      message.includes('schema cache')
+    );
+  },
+
   /**
    * Helper Mapper: Database schema row to Lead object
    */
@@ -177,7 +243,11 @@ export const hotelDb = {
       id: row.id || row.company_name,
       companyName: row.company_name,
       location: row.location || 'Portugal',
+      city: row.city || undefined,
+      country: row.country || undefined,
       niche: row.niche || 'Hotelaria',
+      segment: row.segment || undefined,
+      estimatedRooms: row.estimated_rooms || undefined,
       website: row.website || undefined,
       email: row.email || undefined,
       phone: row.phone || undefined,
@@ -195,6 +265,19 @@ export const hotelDb = {
       contactNotes: row.contact_notes || undefined,
       callbackScheduledAt: row.callback_scheduled_at || undefined,
       callbackStatus: row.callback_status || 'pending',
+      commercialStatus: row.commercial_status || 'new',
+      responsibleSellerId: row.responsible_seller_id || undefined,
+      priority: row.priority || 'medium',
+      leadScore: row.lead_score || 0,
+      source: row.source || undefined,
+      nextActionType: row.next_action_type || undefined,
+      nextActionAt: row.next_action_at || undefined,
+      closeReasonId: row.close_reason_id || undefined,
+      closeNotes: row.close_notes || undefined,
+      doNotContact: row.do_not_contact || false,
+      lastActivityAt: row.last_activity_at || undefined,
+      qualification: row.qualification || undefined,
+      followupSequence: row.followup_sequence || undefined,
       storefront: {
         analyzed: true,
         signageCondition: 'Unknown',

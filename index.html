@@ -35,26 +35,79 @@
       }
     </script>
     <style>
-      body {
-        background-color: #0f172a;
-        color: #e2e8f0;
-      }
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #1e293b; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #475569; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #64748b; 
+      /* ----- Base: tema ESCURO (predefinicao) ----- */
+      body { background-color: #0f172a; color: #e2e8f0; }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #1e293b; }
+      ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+      /* Sidebar com a cor da marca SOL (emerald/teal) */
+      .sol-sidebar { background: linear-gradient(180deg, #062c25 0%, #0b1f2a 55%, #0f172a 100%) !important; }
+      html.theme-light .sol-sidebar { background: linear-gradient(180deg, #ecfdf5 0%, #f0fdfa 55%, #f8fafc 100%) !important; }
+
+      /* =====================================================================
+         TEMA CLARO — ativo apenas quando <html class="theme-light">.
+         O botao Lua/Sol alterna e guarda a preferencia.
+         ===================================================================== */
+      html.theme-light body { background-color: #f1f5f9; color: #0f172a; }
+      html.theme-light ::-webkit-scrollbar-track { background: #e2e8f0; }
+      html.theme-light ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+      html.theme-light ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+      /* superficies */
+      html.theme-light .bg-ai-dark { background-color: #f1f5f9 !important; }
+      html.theme-light .bg-ai-card { background-color: #ffffff !important; }
+      html.theme-light .bg-gray-950, html.theme-light .bg-gray-900, html.theme-light .bg-gray-850, html.theme-light .bg-gray-800 { background-color: #f1f5f9 !important; }
+      html.theme-light .bg-gray-900\/60, html.theme-light .bg-gray-900\/70, html.theme-light .bg-gray-950\/30, html.theme-light .bg-gray-950\/50,
+      html.theme-light .bg-ai-dark\/40, html.theme-light .bg-ai-dark\/98, html.theme-light .bg-gray-800\/40, html.theme-light .bg-gray-800\/60, html.theme-light .bg-gray-800\/30 { background-color: #f8fafc !important; }
+      html.theme-light .hover\:bg-gray-800:hover, html.theme-light .hover\:bg-gray-700:hover, html.theme-light .hover\:bg-gray-800\/40:hover, html.theme-light .hover\:bg-gray-800\/30:hover { background-color: #e2e8f0 !important; }
+
+      /* bordas */
+      html.theme-light .border-gray-950, html.theme-light .border-gray-900, html.theme-light .border-gray-800, html.theme-light .border-gray-700,
+      html.theme-light .border-gray-800\/50, html.theme-light .border-gray-800\/60, html.theme-light .border-gray-800\/80 { border-color: #e2e8f0 !important; }
+      html.theme-light .divide-gray-800 > :not([hidden]) ~ :not([hidden]),
+      html.theme-light .divide-gray-800\/80 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
+
+      /* texto */
+      html.theme-light .text-white { color: #0f172a !important; }
+      html.theme-light .text-gray-100, html.theme-light .text-gray-200, html.theme-light .text-gray-300 { color: #334155 !important; }
+      html.theme-light .text-gray-400 { color: #475569 !important; }
+      html.theme-light .text-gray-500, html.theme-light .text-gray-600 { color: #64748b !important; }
+      html.theme-light .text-gray-700 { color: #94a3b8 !important; }
+
+      /* acentos com mais contraste no branco */
+      html.theme-light .text-emerald-300, html.theme-light .text-emerald-400 { color: #059669 !important; }
+      html.theme-light .text-green-300 { color: #16a34a !important; }
+      html.theme-light .text-sky-300 { color: #0284c7 !important; }
+      html.theme-light .text-blue-300 { color: #2563eb !important; }
+      html.theme-light .text-cyan-300 { color: #0891b2 !important; }
+      html.theme-light .text-indigo-300, html.theme-light .text-indigo-200 { color: #4f46e5 !important; }
+      html.theme-light .text-violet-300, html.theme-light .text-fuchsia-300, html.theme-light .text-purple-300 { color: #7c3aed !important; }
+      html.theme-light .text-rose-300, html.theme-light .text-rose-200, html.theme-light .text-red-300 { color: #e11d48 !important; }
+      html.theme-light .text-amber-300, html.theme-light .text-amber-200, html.theme-light .text-yellow-300 { color: #b45309 !important; }
+      html.theme-light .text-orange-300 { color: #ea580c !important; }
+      html.theme-light .text-lime-300 { color: #65a30d !important; }
+      html.theme-light .text-slate-300 { color: #475569 !important; }
+
+      /* re-branquear o texto sobre botoes/superficies de cor solida */
+      html.theme-light [class*="bg-emerald-6"].text-white, html.theme-light [class*="bg-emerald-7"].text-white, html.theme-light [class*="bg-emerald-5"].text-white,
+      html.theme-light [class*="bg-rose-6"].text-white, html.theme-light [class*="bg-rose-7"].text-white, html.theme-light [class*="bg-red-6"].text-white, html.theme-light [class*="bg-red-7"].text-white, html.theme-light [class*="bg-red-8"].text-white,
+      html.theme-light [class*="bg-sky-6"].text-white, html.theme-light [class*="bg-sky-5"].text-white, html.theme-light [class*="bg-blue-6"].text-white,
+      html.theme-light [class*="bg-green-6"].text-white, html.theme-light [class*="bg-amber-6"].text-white, html.theme-light [class*="bg-orange-6"].text-white,
+      html.theme-light [class*="bg-purple-6"].text-white, html.theme-light [class*="bg-indigo-6"].text-white, html.theme-light [class*="bg-cyan-6"].text-white,
+      html.theme-light [class*="bg-violet-6"].text-white, html.theme-light [class*="bg-fuchsia-6"].text-white, html.theme-light [class*="bg-yellow-6"].text-white, html.theme-light [class*="bg-lime-6"].text-white {
+        color: #ffffff !important;
       }
     </style>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('leadscope_theme') || 'dark';
+          if (t === 'light') document.documentElement.classList.add('theme-light');
+        } catch (e) {}
+      })();
+    </script>
   <script type="importmap">
 {
   "imports": {

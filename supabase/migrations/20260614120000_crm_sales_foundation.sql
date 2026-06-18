@@ -1,10 +1,9 @@
--- BASE DE DADOS PARA O LEADSCOPE / SOL LEADOPS CRM COMERCIAL
--- Este arquivo representa o schema consolidado para novos ambientes.
--- Para ambientes existentes, execute a migration em supabase/migrations.
+-- SOL LeadOps / CRM Comercial - Sales foundation
+-- Run this migration in Supabase SQL Editor or via Supabase CLI.
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- 1. Utilizadores do sistema
+-- 1. App users compatibility table
 CREATE TABLE IF NOT EXISTS app_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -23,7 +22,7 @@ VALUES
 ('Usuario Demo', 'demo@leadscope.ai', 'demo', 'user', 'Pro', 150, 'active')
 ON CONFLICT (email) DO NOTHING;
 
--- 2. Motivos de encerramento comercial
+-- 2. Commercial close/loss reasons
 CREATE TABLE IF NOT EXISTS crm_close_reasons (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -52,7 +51,7 @@ VALUES
 ('Lead duplicado', 'duplicate', FALSE, NULL, TRUE)
 ON CONFLICT (name) DO NOTHING;
 
--- 3. Vendedores
+-- 3. Sales team
 CREATE TABLE IF NOT EXISTS crm_sellers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -71,61 +70,57 @@ CREATE TABLE IF NOT EXISTS crm_sellers (
     status TEXT DEFAULT 'active' CHECK (status IN ('active', 'inactive'))
 );
 
--- 4. Leads / hoteis prospectados
-CREATE TABLE IF NOT EXISTS hotels (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    company_name TEXT NOT NULL,
-    location TEXT NOT NULL,
-    city TEXT,
-    country TEXT,
-    niche TEXT DEFAULT 'Hotelaria',
-    segment TEXT,
-    estimated_rooms INTEGER,
-    website TEXT,
-    email TEXT,
-    phone TEXT,
-    contact_person TEXT,
-    contact_notes TEXT,
-    callback_scheduled_at TIMESTAMP WITH TIME ZONE,
-    callback_status TEXT DEFAULT 'pending' CHECK (callback_status IN ('pending', 'completed', 'canceled')),
-    potential TEXT DEFAULT 'Medium' CHECK (potential IN ('Hot', 'Medium', 'Cold')),
-    maps_rating NUMERIC(3,2),
-    maps_reviews INTEGER,
-    source TEXT,
-    commercial_status TEXT DEFAULT 'new' CHECK (
-        commercial_status IN (
-            'new',
-            'prepared',
-            'scheduled_contact',
-            'in_contact',
-            'contacted_reception',
-            'decision_maker_identified',
-            'rescheduled',
-            'demo_scheduled',
-            'demo_completed',
-            'follow_up',
-            'proposal_sent',
-            'won',
-            'lost',
-            'do_not_contact'
-        )
-    ),
-    responsible_seller_id UUID REFERENCES crm_sellers(id) ON DELETE SET NULL,
-    priority TEXT DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
-    lead_score INTEGER DEFAULT 0,
-    next_action_type TEXT CHECK (
-        next_action_type IS NULL OR next_action_type IN ('call', 'demo', 'email', 'whatsapp', 'follow_up', 'proposal', 'none')
-    ),
-    next_action_at TIMESTAMP WITH TIME ZONE,
-    close_reason_id UUID REFERENCES crm_close_reasons(id) ON DELETE SET NULL,
-    close_notes TEXT,
-    do_not_contact BOOLEAN DEFAULT FALSE,
-    last_activity_at TIMESTAMP WITH TIME ZONE
+-- 4. Expand current hotels table into the CRM lead record used by the app
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS country TEXT;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS segment TEXT;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS estimated_rooms INTEGER;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS source TEXT;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS commercial_status TEXT DEFAULT 'new' CHECK (
+    commercial_status IN (
+        'new',
+        'prepared',
+        'scheduled_contact',
+        'in_contact',
+        'contacted_reception',
+        'decision_maker_identified',
+        'rescheduled',
+        'demo_scheduled',
+        'demo_completed',
+        'follow_up',
+        'proposal_sent',
+        'won',
+        'lost',
+        'do_not_contact'
+    )
 );
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS responsible_seller_id UUID REFERENCES crm_sellers(id) ON DELETE SET NULL;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS priority TEXT DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low'));
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS lead_score INTEGER DEFAULT 0;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS next_action_type TEXT CHECK (
+    next_action_type IS NULL OR next_action_type IN ('call', 'demo', 'email', 'whatsapp', 'follow_up', 'proposal', 'none')
+);
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS next_action_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS close_reason_id UUID REFERENCES crm_close_reasons(id) ON DELETE SET NULL;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS close_notes TEXT;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS do_not_contact BOOLEAN DEFAULT FALSE;
+ALTER TABLE hotels ADD COLUMN IF NOT EXISTS last_activity_at TIMESTAMP WITH TIME ZONE;
 
--- 5. Contactos do hotel
+UPDATE hotels
+SET
+    commercial_status = COALESCE(commercial_status, 'new'),
+    priority = COALESCE(priority, 'medium'),
+    lead_score = COALESCE(lead_score, 0),
+    do_not_contact = COALESCE(do_not_contact, FALSE),
+    updated_at = COALESCE(updated_at, created_at, NOW())
+WHERE commercial_status IS NULL
+   OR priority IS NULL
+   OR lead_score IS NULL
+   OR do_not_contact IS NULL
+   OR updated_at IS NULL;
+
+-- 5. Hotel contacts
 CREATE TABLE IF NOT EXISTS crm_contacts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -145,7 +140,7 @@ CREATE TABLE IF NOT EXISTS crm_contacts (
     notes TEXT
 );
 
--- 6. Historico de atividades comerciais
+-- 6. Activity timeline
 CREATE TABLE IF NOT EXISTS crm_activities (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -165,7 +160,7 @@ CREATE TABLE IF NOT EXISTS crm_activities (
     next_action_at TIMESTAMP WITH TIME ZONE
 );
 
--- 7. Agenda semanal comercial
+-- 7. Weekly planning slots
 CREATE TABLE IF NOT EXISTS crm_schedule_slots (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -180,7 +175,7 @@ CREATE TABLE IF NOT EXISTS crm_schedule_slots (
     CONSTRAINT crm_schedule_slots_valid_time CHECK (slot_end > slot_start)
 );
 
--- 8. Scripts comerciais
+-- 8. Commercial scripts
 CREATE TABLE IF NOT EXISTS crm_scripts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -193,7 +188,7 @@ CREATE TABLE IF NOT EXISTS crm_scripts (
     active BOOLEAN DEFAULT TRUE
 );
 
--- 9. Banco de objeccoes
+-- 9. Objection bank
 CREATE TABLE IF NOT EXISTS crm_objections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -212,7 +207,7 @@ VALUES
 ('Ja temos sistema', 'Perfeito. A conversa pode ser para perceber se o sistema atual cobre housekeeping, manutencao, auditoria e comunicacao em tempo real.', 'concorrente', TRUE)
 ON CONFLICT (objection) DO NOTHING;
 
--- 10. Materiais comerciais
+-- 10. Commercial materials
 CREATE TABLE IF NOT EXISTS crm_materials (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -225,7 +220,7 @@ CREATE TABLE IF NOT EXISTS crm_materials (
     active BOOLEAN DEFAULT TRUE
 );
 
--- 11. View de leitura com nomenclatura do CRM
+-- 11. Compatibility read view for the CRM naming used in the PRD
 CREATE OR REPLACE VIEW crm_leads AS
 SELECT
     h.id,
@@ -275,46 +270,3 @@ CREATE INDEX IF NOT EXISTS idx_crm_activities_lead_id_created_at ON crm_activiti
 CREATE INDEX IF NOT EXISTS idx_crm_activities_seller_id_created_at ON crm_activities(seller_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_crm_schedule_slots_seller_start ON crm_schedule_slots(seller_id, slot_start);
 CREATE INDEX IF NOT EXISTS idx_crm_schedule_slots_lead_id ON crm_schedule_slots(lead_id);
-
-
--- =====================================================================
--- CRM access policies (app uses the anon key as its data layer)
--- Without these, RLS blocks read/write on the CRM tables and the app
--- falls back to localStorage (e.g. sellers were not persisting).
--- =====================================================================
-DO $$
-DECLARE
-    t TEXT;
-    crm_tables TEXT[] := ARRAY[
-        'crm_sellers','crm_contacts','crm_activities','crm_schedule_slots',
-        'crm_close_reasons','crm_scripts','crm_objections','crm_materials'
-    ];
-BEGIN
-    FOREACH t IN ARRAY crm_tables
-    LOOP
-        IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name=t) THEN
-            EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
-            EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON public.%I TO anon, authenticated;', t);
-            EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I;', t || '_app_all', t);
-            EXECUTE format('CREATE POLICY %I ON public.%I FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);', t || '_app_all', t);
-        END IF;
-    END LOOP;
-END $$;
-
--- app_users access policy (login + criacao de contas de vendedor via anon key)
-DO $$
-BEGIN
-    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='app_users') THEN
-        ALTER TABLE public.app_users ENABLE ROW LEVEL SECURITY;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON public.app_users TO anon, authenticated;
-        DROP POLICY IF EXISTS app_users_app_all ON public.app_users;
-        CREATE POLICY app_users_app_all ON public.app_users FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
-    END IF;
-END $$;
-
--- M34 Qualificacao do lead + M37 Objecoes inteligentes
-ALTER TABLE hotels ADD COLUMN IF NOT EXISTS qualification JSONB;
-ALTER TABLE crm_objections ADD COLUMN IF NOT EXISTS full_response TEXT;
-ALTER TABLE crm_objections ADD COLUMN IF NOT EXISTS follow_up_question TEXT;
-ALTER TABLE crm_objections ADD COLUMN IF NOT EXISTS recommended_material TEXT;
-ALTER TABLE crm_objections ADD COLUMN IF NOT EXISTS next_action TEXT;

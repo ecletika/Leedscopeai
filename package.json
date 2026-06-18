@@ -16,8 +16,10 @@
     "lucide-react": "^0.562.0",
     "motion": "^12.40.0",
     "nodemailer": "^8.0.10",
+    "pg": "^8.21.0",
     "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "react-dom": "^19.2.3",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

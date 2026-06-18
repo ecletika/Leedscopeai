@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
+import ThemeToggle from './components/ThemeToggle';
 import { User } from './types';
 import { Lock, Mail, ArrowRight, AlertCircle, Loader2, Database, Copy, Check, Info, FileText, UserCheck, Inbox, RefreshCw, ArrowLeft } from 'lucide-react';
 import { supabase } from './services/supabaseClient';
@@ -508,6 +509,12 @@ ON CONFLICT (email) DO NOTHING;`;
   }
 
   return (
+    <>
+    {view !== 'dashboard' && (
+      <div className="fixed top-4 right-4 z-[100]">
+        <ThemeToggle />
+      </div>
+    )}
     <AnimatePresence mode="wait" initial={false}>
       {view === 'landing' && (
         <motion.div
@@ -974,5 +981,6 @@ ON CONFLICT (email) DO NOTHING;`;
         </motion.div>
       )}
     </AnimatePresence>
+    </>
   );
 }

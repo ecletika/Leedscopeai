@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Lead, ProcessingStage, User, SmtpConfig, Campaign, PlanDefinition } from '../types';
 import AgentCard from './AgentCard';
 import LeadResults from './LeadResults';
@@ -6,9 +6,25 @@ import ProposalModal from './ProposalModal';
 import AskAIModal from './AskAIModal';
 import CodePreviewModal from './CodePreviewModal';
 import HotelManagement from './HotelManagement';
-import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot } from 'lucide-react';
+import SellerManagement from './SellerManagement';
+import WeeklyPlanner from './WeeklyPlanner';
+import CommercialDashboard from './CommercialDashboard';
+import PipelineKanban from './PipelineKanban';
+import CommercialLibrary from './CommercialLibrary';
+import FollowUpCenter from './FollowUpCenter';
+import PlayMode from './PlayMode';
+import DemoMode from './DemoMode';
+import MessageTemplates from './MessageTemplates';
+import QualificationModal from './QualificationModal';
+import SalesTools from './SalesTools';
+import ProposalBuilder from './ProposalBuilder';
+import ThemeToggle from './ThemeToggle';
+import Academy from './Academy';
+import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, CalendarClock, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, Users, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot, BarChart3, KanbanSquare, BookOpen, RotateCcw, Lightbulb, GraduationCap } from 'lucide-react';
 import { searchLeadsInLocation, analyzeAndGenerateProposal, generateOutreachEmail, runStorefrontInvestigation, generateCommercialProposal, askLeadQuestion, generateWebsiteCode, refineWebsiteCode } from '../services/geminiService';
 import { hotelDb } from '../services/hotelDb';
+import { crmDb } from '../services/crmDb';
+import { CrmSeller, CrmCloseReason } from '../types';
 import { SystemHealth } from './SystemHealth';
 
 const AGENTS = [
@@ -26,6 +42,25 @@ const INITIAL_PLANS: PlanDefinition[] = [
     { id: '3', name: 'Agency', price: '199€', credits: 9999, features: ['API Access', 'White-label'] }
 ];
 
+const COUNTRY_OPTIONS = [
+  { code: 'PT', name: 'Portugal', defaultLocations: 'Lisboa, Porto, Algarve' },
+  { code: 'AO', name: 'Angola', defaultLocations: 'Luanda, Benguela, Lubango' },
+  { code: 'BR', name: 'Brasil', defaultLocations: 'São Paulo, Rio de Janeiro, Salvador' }
+];
+
+// Memoria de leads ja mostrados por pesquisa (evita repetir os mesmos hoteis)
+const seenLeadsKey = (country: string, location: string, niche: string) =>
+  `leadscope_seen_leads_${country}_${location}_${niche}`.toLowerCase().replace(/\s+/g, '_');
+
+const getSeenLeads = (key: string): string[] => {
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch { return []; }
+};
+
+const addSeenLeads = (key: string, names: string[]) => {
+  const merged = new Set([...getSeenLeads(key), ...names].map((n) => (n || '').trim()).filter(Boolean));
+  localStorage.setItem(key, JSON.stringify(Array.from(merged)));
+};
+
 interface DashboardProps {
   currentUser: User;
   allUsers: User[];
@@ -34,10 +69,20 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'database' | 'agenda' | 'history' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'database' | 'pipeline' | 'planner' | 'followup' | 'tools' | 'academy' | 'agenda' | 'crm' | 'sellers' | 'library' | 'history' | 'admin'>('dashboard');
+
+  // CRM Play mode overlay
+  const [activeLeadForPlay, setActiveLeadForPlay] = useState<Lead | null>(null);
+  const [activeLeadForDemo, setActiveLeadForDemo] = useState<Lead | null>(null);
+  const [activeLeadForMessages, setActiveLeadForMessages] = useState<Lead | null>(null);
+  const [activeLeadForQualify, setActiveLeadForQualify] = useState<Lead | null>(null);
+  const [activeLeadForProposalBuilder, setActiveLeadForProposalBuilder] = useState<Lead | null>(null);
+  const [crmSellers, setCrmSellers] = useState<CrmSeller[]>([]);
+  const [crmCloseReasons, setCrmCloseReasons] = useState<CrmCloseReason[]>([]);
   
   // Search State
   const [campaignName, setCampaignName] = useState('Hotéis Portugal - Housekeeping');
+  const [country, setCountry] = useState('PT');
   const [location, setLocation] = useState('Lisboa, Porto, Algarve');
   const [niche, setNiche] = useState('Hotéis');
   const [aiContext, setAiContext] = useState('Análise de reputação de limpeza e adequabilidade do Sistema de Governança'); 
@@ -81,9 +126,64 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
     }
   };
 
+  const loadCrmMeta = async () => {
+    try {
+      const [sellerRows, reasonRows] = await Promise.all([
+        crmDb.getSellers(),
+        crmDb.getCloseReasons()
+      ]);
+      setCrmSellers(sellerRows);
+      setCrmCloseReasons(reasonRows);
+    } catch (err) {
+      console.warn('Falha ao carregar metadados CRM:', err);
+    }
+  };
+
   useEffect(() => {
     loadSavedHotels();
+    loadCrmMeta();
   }, []);
+
+  // Permissoes comerciais: descobre o vendedor associado ao utilizador logado
+  const currentSeller = useMemo(
+    () => crmSellers.find((s) =>
+      (s.userId && s.userId === currentUser.id) ||
+      s.email.toLowerCase() === currentUser.email.toLowerCase()
+    ),
+    [crmSellers, currentUser.id, currentUser.email]
+  );
+
+  // Vendedores (papel 'seller') so veem os seus leads. Admin e supervisor veem tudo.
+  const restrictSellerId = useMemo(() => {
+    if (currentUser.role === 'admin') return undefined;
+    if (currentSeller && currentSeller.role === 'seller') return currentSeller.id;
+    return undefined;
+  }, [currentUser.role, currentSeller]);
+
+  const handleOpenPlay = (lead: Lead) => {
+    setActiveLeadForPlay(lead);
+  };
+
+  const handleOpenDemo = (lead: Lead) => {
+    setActiveLeadForDemo(lead);
+  };
+
+  const handleOpenMessages = (lead: Lead) => {
+    setActiveLeadForMessages(lead);
+  };
+
+  const handleOpenQualify = (lead: Lead) => {
+    setActiveLeadForQualify(lead);
+  };
+
+  const handleOpenProposalBuilder = (lead: Lead) => {
+    setActiveLeadForProposalBuilder(lead);
+  };
+
+  const handlePlaySaved = async () => {
+    await loadSavedHotels();
+    await loadCrmMeta();
+  };
 
   // Save Lead from active search results campaign directly into the B2B CRM database
   const handleSaveToDb = async (lead: Lead) => {
@@ -246,9 +346,22 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
       updateAgent(0, 'working', `A iniciar campanha "${campaignName}"...`);
       updateAgent(1, 'working', `A consumir 1 Crédito...`);
       updateAgent(1, 'working', `A pesquisar e validar empresas...`);
-      
-      const rawLeads = await searchLeadsInLocation(location, niche, aiContext, campaignName);
-      
+
+      // Exclui leads ja conhecidos: CRM + historico de campanhas + ja mostrados nesta pesquisa
+      const seenKey = seenLeadsKey(country, location, niche);
+      const excludeNames = Array.from(new Set([
+        ...savedHotels.map((h) => h.companyName),
+        ...currentUser.campaigns.flatMap((c) => c.leads.map((l) => l.companyName)),
+        ...getSeenLeads(seenKey)
+      ].map((n) => (n || '').trim()).filter(Boolean)));
+
+      const rawLeads = await searchLeadsInLocation(country, location, niche, aiContext, campaignName, excludeNames);
+
+      // Memoriza tudo o que veio para nao repetir na proxima pesquisa
+      if (rawLeads && rawLeads.length > 0) {
+        addSeenLeads(seenKey, rawLeads.map((l) => l.companyName || '').filter(Boolean));
+      }
+
       if (!rawLeads || rawLeads.length === 0) {
           updateAgent(1, 'error', `Nenhuma empresa válida encontrada com estes critérios.`);
           updateAgent(0, 'error', `Processo cancelado.`);
@@ -286,7 +399,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
           id: crypto.randomUUID(),
           name: campaignName,
           date: new Date().toISOString(),
-          location: location || "Geral",
+          location: `${COUNTRY_OPTIONS.find(option => option.code === country)?.name || country}${location ? ` - ${location}` : ''}`,
           niche: niche || "Vários",
           leads: processedLeads
       };
@@ -477,7 +590,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
   return (
     <div className="flex h-screen bg-ai-dark text-white overflow-hidden font-sans">
-      <aside className="w-64 border-r border-gray-800 bg-ai-dark/50 hidden md:flex flex-col p-4 shrink-0">
+      <aside className="sol-sidebar w-64 border-r border-gray-800 hidden md:flex flex-col p-4 shrink-0">
         <div className="flex items-center gap-2 mb-8 px-2">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
               <Activity className="w-5 h-5 text-white" />
@@ -507,8 +620,34 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 )}
             </button>
 
-            <button 
-                onClick={() => setActiveTab('agenda')} 
+            <button
+                onClick={() => setActiveTab('pipeline')}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'pipeline' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <KanbanSquare className="w-4 h-4" /> Pipeline
+            </button>
+
+            <button
+                onClick={() => setActiveTab('planner')}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'planner' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <CalendarClock className="w-4 h-4" /> Planeador Semanal
+            </button>
+
+            <button
+                onClick={() => setActiveTab('followup')}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'followup' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <RotateCcw className="w-4 h-4" /> Follow-ups
+                {savedHotels.filter(h => h.nextActionAt && new Date(h.nextActionAt) < new Date() && !['won','lost','do_not_contact'].includes(h.commercialStatus || 'new')).length > 0 && (
+                  <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-rose-600 text-white rounded font-mono font-bold leading-none">
+                    {savedHotels.filter(h => h.nextActionAt && new Date(h.nextActionAt) < new Date() && !['won','lost','do_not_contact'].includes(h.commercialStatus || 'new')).length}
+                  </span>
+                )}
+            </button>
+
+            <button
+                onClick={() => setActiveTab('agenda')}
                 className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'agenda' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
             >
                 <Calendar className="w-4 h-4" /> Agenda de Chamadas
@@ -519,8 +658,47 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 )}
             </button>
             
-            <button 
-                onClick={() => { setActiveTab('history'); setSelectedCampaign(null); }} 
+            <button
+                onClick={() => setActiveTab('tools')}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'tools' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <Lightbulb className="w-4 h-4" /> Ferramentas de Venda
+            </button>
+
+            <button
+                onClick={() => setActiveTab('academy')}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'academy' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <GraduationCap className="w-4 h-4" /> Academia SOL
+            </button>
+
+            <button
+                onClick={() => setActiveTab('crm')}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'crm' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <BarChart3 className="w-4 h-4" /> Dashboard Vendas
+            </button>
+
+            {currentUser.role === 'admin' && (
+                <button
+                    onClick={() => setActiveTab('sellers')}
+                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'sellers' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+                >
+                    <Users className="w-4 h-4" /> Equipa Comercial
+                </button>
+            )}
+
+            {currentUser.role === 'admin' && (
+                <button
+                    onClick={() => setActiveTab('library')}
+                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'library' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+                >
+                    <BookOpen className="w-4 h-4" /> Scripts & Materiais
+                </button>
+            )}
+
+            <button
+                onClick={() => { setActiveTab('history'); setSelectedCampaign(null); }}
                 className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'history' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
             >
                 <History className="w-4 h-4" /> Histórico Campanhas
@@ -550,14 +728,23 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             <h1 className="font-bold text-white tracking-tight flex items-center gap-2">
                 {activeTab === 'dashboard' && 'Pesquisa e Análise de Hotéis'}
                 {activeTab === 'database' && 'Base de Dados de Hotéis & CRM'}
+                {activeTab === 'pipeline' && 'Pipeline Comercial'}
+                {activeTab === 'planner' && 'Planeador Comercial Semanal'}
+                {activeTab === 'followup' && 'Follow-up e Reagendamentos'}
+                {activeTab === 'tools' && 'Ferramentas de Venda'}
+                {activeTab === 'academy' && 'Academia SOL'}
                 {activeTab === 'agenda' && 'Agenda para Voltar Contactos (Callbacks)'}
+                {activeTab === 'crm' && 'Dashboard de Vendas'}
+                {activeTab === 'sellers' && 'Equipa Comercial'}
+                {activeTab === 'library' && 'Scripts, Objeções e Materiais'}
                 {activeTab === 'history' && 'Histórico de Pesquisas'}
                 {activeTab === 'admin' && 'Gestão Administrativa'}
             </h1>
             <div className="flex items-center gap-4 text-sm">
+                <ThemeToggle />
                 <div className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-full flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-emerald-400" />
-                    <span className="font-bold text-white">{currentUser.credits}</span> 
+                    <span className="font-bold text-white">{currentUser.credits}</span>
                     <span className="text-gray-400 text-xs">créditos</span>
                 </div>
                 <div className="flex items-center gap-2 text-gray-400 text-xs font-mono">
@@ -582,7 +769,21 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                            <select
+                                value={country}
+                                onChange={e => {
+                                    const nextCountry = e.target.value;
+                                    setCountry(nextCountry);
+                                    const selected = COUNTRY_OPTIONS.find(option => option.code === nextCountry);
+                                    if (selected) setLocation(selected.defaultLocations);
+                                }}
+                                className="bg-ai-dark border border-gray-700 rounded p-3 text-sm md:col-span-1"
+                            >
+                                {COUNTRY_OPTIONS.map(option => (
+                                    <option key={option.code} value={option.code}>{option.name}</option>
+                                ))}
+                            </select>
                             <input 
                                 value={location} onChange={e => setLocation(e.target.value)}
                                 placeholder="Localização (Opcional)"
@@ -694,10 +895,77 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                             <AlertTriangle className="w-4 h-4" /> {isLoadingError}
                         </div>
                     )}
-                    <HotelManagement 
+                    <HotelManagement
                         onSelectProposal={handleOpenProposal}
                         onSelectChat={handleOpenChat}
+                        onOpenPlay={handleOpenPlay}
+                        onOpenDemo={handleOpenDemo}
+                        onOpenMessages={handleOpenMessages}
+                        onOpenQualify={handleOpenQualify}
+                        onOpenProposalBuilder={handleOpenProposalBuilder}
+                        restrictSellerId={restrictSellerId}
                     />
+                </div>
+            )}
+
+            {/* --- PIPELINE KANBAN --- */}
+            {activeTab === 'pipeline' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <PipelineKanban
+                        onOpenPlay={handleOpenPlay}
+                        onSelectProposal={handleOpenProposal}
+                        onSelectChat={handleOpenChat}
+                        restrictSellerId={restrictSellerId}
+                    />
+                </div>
+            )}
+
+            {/* --- PLANEADOR SEMANAL --- */}
+            {activeTab === 'planner' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <WeeklyPlanner onOpenPlay={handleOpenPlay} restrictSellerId={restrictSellerId} />
+                </div>
+            )}
+
+            {/* --- FOLLOW-UP E REAGENDAMENTOS (M29) --- */}
+            {activeTab === 'followup' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <FollowUpCenter onOpenPlay={handleOpenPlay} restrictSellerId={restrictSellerId} />
+                </div>
+            )}
+
+            {/* --- FERRAMENTAS DE VENDA (M35/M41/M42/M46) --- */}
+            {activeTab === 'tools' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <SalesTools />
+                </div>
+            )}
+
+            {/* --- ACADEMIA SOL (M43) --- */}
+            {activeTab === 'academy' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <Academy />
+                </div>
+            )}
+
+            {/* --- DASHBOARD DE VENDAS --- */}
+            {activeTab === 'crm' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <CommercialDashboard restrictSellerId={restrictSellerId} />
+                </div>
+            )}
+
+            {/* --- EQUIPA COMERCIAL --- */}
+            {activeTab === 'sellers' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <SellerManagement />
+                </div>
+            )}
+
+            {/* --- SCRIPTS & MATERIAIS (M28) --- */}
+            {activeTab === 'library' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <CommercialLibrary />
                 </div>
             )}
 
@@ -1233,6 +1501,52 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 </div>
             )}
         </div>
+
+        {/* --- MODO PLAY (M23) --- */}
+        {activeLeadForPlay && (
+            <PlayMode
+                lead={activeLeadForPlay}
+                sellers={crmSellers}
+                closeReasons={crmCloseReasons}
+                onClose={() => setActiveLeadForPlay(null)}
+                onSaved={handlePlaySaved}
+            />
+        )}
+
+        {/* --- MODO DEMO COMERCIAL (M31) --- */}
+        {activeLeadForDemo && (
+            <DemoMode
+                lead={activeLeadForDemo}
+                onClose={() => setActiveLeadForDemo(null)}
+                onSaved={handlePlaySaved}
+            />
+        )}
+
+        {/* --- TEMPLATES DE EMAIL/WHATSAPP (M38) --- */}
+        {activeLeadForMessages && (
+            <MessageTemplates
+                lead={activeLeadForMessages}
+                onClose={() => setActiveLeadForMessages(null)}
+            />
+        )}
+
+        {/* --- QUALIFICACAO DO LEAD (M34) --- */}
+        {activeLeadForQualify && (
+            <QualificationModal
+                lead={activeLeadForQualify}
+                onClose={() => setActiveLeadForQualify(null)}
+                onSaved={handlePlaySaved}
+            />
+        )}
+
+        {/* --- PROPOSTA COMERCIAL (M40) --- */}
+        {activeLeadForProposalBuilder && (
+            <ProposalBuilder
+                lead={activeLeadForProposalBuilder}
+                onClose={() => setActiveLeadForProposalBuilder(null)}
+                onSaved={handlePlaySaved}
+            />
+        )}
 
         {/* --- MODALS --- */}
         {activeLeadForProposal && (
