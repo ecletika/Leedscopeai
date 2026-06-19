@@ -5,7 +5,6 @@ import cors from "cors";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
-import { createServer as createViteServer } from "vite";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
 
@@ -35,9 +34,8 @@ function loadLocalEnv() {
 
 loadLocalEnv();
 
-async function startServer() {
+export function buildApp() {
   const app = express();
-  const PORT = Number(process.env.PORT || 6001);
   const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
   app.use(cors());
@@ -1598,24 +1596,5 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     }
   });
 
-  // Integrates Vite development server middleware in development mode
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  return app;
 }
-
-startServer();

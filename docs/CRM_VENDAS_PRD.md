@@ -1536,3 +1536,18 @@ Estado do roadmap M31-M51: concluido tudo o que depende de nos (Fases 1, 2 e 3).
 - Sidebar: substituido o cinza por gradiente da marca SOL (emerald/teal) via classe `.sol-sidebar` definida em `index.html`, adaptada aos dois temas (escuro e claro).
 - `components/Academy.tsx` (M43 Academia Comercial): nova aba "Academia SOL" com 8 licoes de formacao (o que e o SOL, fluxo de housekeeping, dores, como falar com cada persona, objecoes, demo, preencher CRM, fechar) e checklist "Vendedor aprovado para vender SOL" com barra de progresso, persistida em localStorage. Liga ao Simulador IA e ao Playbook.
 - Validado `npm run build` e `tsc --noEmit` sem erros.
+
+### 2026-06-15 - Correcao do deploy na Vercel (404 no root)
+
+Problema: `vendas.ecletika.com/` devolvia 404. O `vercel.json` legado (builds+routes) apontava /api para `dist/server.cjs`, que faz `app.listen()` — nao funciona em serverless — e nao servia o `dist` estatico.
+
+Correcao:
+
+- `server.ts` passou a exportar `buildApp()` (sem `app.listen`, sem Vite) em vez de arrancar o servidor.
+- Novo `dev.ts`: runner local (Vite em dev, dist estatico em producao) — usado por `npm run dev`/`start`.
+- Nova funcao serverless `api/[...path].ts` que reutiliza a app Express (`export default buildApp()`); a Vercel encaminha todos os `/api/*` para aqui.
+- `vercel.json` modernizado: `buildCommand: vite build`, `outputDirectory: dist`, e rewrite SPA `/((?!api/).*) -> /index.html` (assets e /api servidos diretamente).
+- `package.json`: `dev`/`build`/`start` passam a usar `dev.ts`.
+- Validado local (`npm run build`, `tsc --noEmit`, arranque do `dev.ts` -> root HTTP 200).
+
+Para o deploy funcionar 100%, definir na Vercel as variaveis de ambiente do projeto: GEMINI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_ROLE_KEY. O frontend liga ao Supabase mesmo sem env (chave anon embutida), por isso o CRM carrega; as variaveis sao necessarias para a API (IA, criacao de contas de vendedor).
