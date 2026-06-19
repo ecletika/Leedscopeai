@@ -1551,3 +1551,16 @@ Correcao:
 - Validado local (`npm run build`, `tsc --noEmit`, arranque do `dev.ts` -> root HTTP 200).
 
 Para o deploy funcionar 100%, definir na Vercel as variaveis de ambiente do projeto: GEMINI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_ROLE_KEY. O frontend liga ao Supabase mesmo sem env (chave anon embutida), por isso o CRM carrega; as variaveis sao necessarias para a API (IA, criacao de contas de vendedor).
+
+### 2026-06-15 - Vercel /api resolvido (funcao self-contained)
+
+Causa raiz: a Vercel nao compilava/empacotava `server.ts` (fora de `api/`), logo a funcao crashava com `ERR_MODULE_NOT_FOUND: Cannot find module '/var/task/server'`.
+
+Solucao final:
+
+- `server-entry.ts` (handler que importa `buildApp`) e empacotado por esbuild (CJS, todas as dependencias inline) para `api/index.js` — funcao self-contained, sem resolucao de modulos em runtime.
+- `api/package.json` com `{ "type": "commonjs" }` evita o crash de "Dynamic require" (projeto raiz e ESM).
+- `buildCommand` e `npm run build:api` regeneram o bundle a partir de `server.ts`.
+- Validado em producao: `/api/gemini/health` devolve JSON; `/api/gemini/searchLeads` devolve leads reais (RNET) mesmo sem GEMINI_API_KEY (fallback).
+
+Pendente (config na Vercel, do lado do cliente): definir `GEMINI_API_KEY` (features de IA) e `SUPABASE_ROLE_KEY` (criar contas de vendedor). O frontend liga ao Supabase via chave anon embutida.
