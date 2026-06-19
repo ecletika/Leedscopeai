@@ -69,6 +69,28 @@ export function buildApp() {
     });
   };
 
+  // Groq client — pura geração de texto via fetch nativo, sem pacote extra
+  const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+
+  const callGroq = async (
+    messages: Array<{ role: string; content: string }>,
+    temperature = 0.7
+  ): Promise<string> => {
+    const apiKey = process.env.GROQ_API_KEY?.trim();
+    if (!apiKey) throw new Error("GROQ_API_KEY não definida no .env.local");
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ model: GROQ_MODEL, messages, temperature }),
+    });
+    const json = await res.json() as any;
+    if (!res.ok) throw new Error(`Groq ${res.status}: ${json.error?.message || "Erro desconhecido"}`);
+    return (json.choices?.[0]?.message?.content as string) ?? "";
+  };
+
   const getPrimaryUrl = (item: any) => {
     return item.extratags?.website ||
       item.extratags?.contact_website ||
@@ -762,6 +784,96 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     }
   });
 
+  // ─── Brevo — envio de email comercial ────────────────────────────────────
+  function escHtml(str: string | null | undefined): string {
+    if (!str) return "";
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+              .replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+  }
+
+  async function sendViaBrevo(payload: {
+    sender: { name: string; email: string };
+    to: { email: string; name?: string }[];
+    subject: string;
+    htmlContent: string;
+  }): Promise<string> {
+    const apiKey = process.env.BREVO_API_KEY?.trim();
+    if (!apiKey) throw new Error("BREVO_API_KEY não definida no .env.local");
+
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const json = await res.json() as { messageId?: string; message?: string };
+    if (!res.ok) throw new Error(`Brevo ${res.status}: ${json.message ?? JSON.stringify(json)}`);
+    return json.messageId ?? "sem-id";
+  }
+
+  app.post('/api/email/send', async (req, res) => {
+    const { to, toName, subject, body, leadId, sellerId, hotelName } = req.body || {};
+
+    if (!to || !subject || !body) {
+      return res.status(400).json({ error: "Campos obrigatórios: to, subject, body" });
+    }
+
+    const fromName = process.env.BREVO_FROM_NAME?.trim() || "LeadScope · Ecletika";
+    const fromEmail = process.env.BREVO_FROM_EMAIL?.trim();
+    if (!fromEmail) return res.status(500).json({ error: "BREVO_FROM_EMAIL não configurado" });
+
+    const bodyHtml = escHtml(body).replace(/\n/g, "<br>");
+
+    try {
+      const messageId = await sendViaBrevo({
+        sender: { name: fromName, email: fromEmail },
+        to: [{ email: to, name: toName || "" }],
+        subject,
+        htmlContent: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#f8fbff;">
+            <div style="background:linear-gradient(135deg,#10b981,#047857);padding:28px 32px;">
+              <p style="color:rgba(255,255,255,0.75);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.28em;margin:0 0 6px;">SOL · Plataforma de Operações Hoteleiras</p>
+              <h1 style="color:#fff;font-size:18px;font-weight:800;margin:0;">${escHtml(hotelName || "")}</h1>
+            </div>
+            <div style="background:#fff;padding:32px;font-size:15px;color:#1a1a2e;line-height:1.7;">
+              ${bodyHtml}
+            </div>
+            <div style="padding:16px 32px;text-align:center;color:#a0aab8;font-size:11px;border-top:1px solid #f0f3f8;">
+              LeadScope · Ecletika — ecletikaportugal@gmail.com
+            </div>
+          </div>
+        `,
+      });
+
+      // Log automático na tabela crm_activities
+      if (leadId) {
+        const supabase = getSupabaseAdmin();
+        if (supabase) {
+          await supabase.from("crm_activities").insert({
+            lead_id: leadId,
+            seller_id: sellerId || null,
+            activity_type: "email",
+            outcome: "sent",
+            notes: `Email enviado via Brevo: "${subject}"`,
+            next_action_type: null,
+            next_action_at: null,
+          });
+        }
+      }
+
+      console.log(`[Brevo] ✅ Email enviado para ${to} | messageId: ${messageId}`);
+      res.json({ success: true, messageId });
+    } catch (err: any) {
+      console.error("[Brevo] Erro:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+  // ─────────────────────────────────────────────────────────────────────────
+
   app.get('/api/rnet/search', async (req, res) => {
     try {
       const location = String(req.query.location || req.query.concelho || "");
@@ -926,8 +1038,9 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   });
 
   app.use('/api/gemini', (req, res, next) => {
-    const canRunWithoutGemini = req.path === "/searchLeads" || req.path === "/analyzeAndProposal" || req.path === "/generateProposal";
-    if (!process.env.GEMINI_API_KEY && !canRunWithoutGemini) {
+    // Estes paths não precisam de Gemini: usam Groq ou são templates estáticos
+    const noGeminiNeeded = ["/searchLeads", "/analyzeAndProposal", "/generateProposal", "/simulate", "/askQuestion"];
+    if (!process.env.GEMINI_API_KEY && !noGeminiNeeded.includes(req.path)) {
       return res.status(503).json({
         error: "GEMINI_API_KEY não está configurada. Crie um arquivo .env.local com GEMINI_API_KEY=sua_chave ou defina a variável de ambiente antes de iniciar o servidor."
       });
@@ -1120,11 +1233,10 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     }
   });
 
-  // Route: simulador de chamada com IA (M44) - role-play e avaliacao
+  // Route: simulador de chamada com IA (M44) - role-play e avaliacao — via Groq
   app.post('/api/gemini/simulate', async (req, res) => {
     try {
       const { persona, history, message, mode } = req.body || {};
-      const ai = getGeminiClient();
 
       const personaDesc: Record<string, string> = {
         reception_busy: 'uma rececionista de hotel muito ocupada, com pouca paciencia, que tenta despachar a chamada rapidamente',
@@ -1146,13 +1258,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         prompt = `Estas a fazer role-play numa simulacao de treino. Es ${desc}, a receber uma chamada fria de um vendedor da SOL.\n\nRegras: responde SEMPRE e APENAS como essa personagem, em PT-PT, de forma curta e realista (1 a 3 frases). Mantem-te na personagem, com objecoes e duvidas naturais. Nunca digas que es uma IA nem expliques as regras.\n\n${transcript ? `Conversa ate agora:\n${transcript}\n\n` : ''}O vendedor diz agora: "${message}"\n\nResponde como ${desc}:`;
       }
 
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: prompt,
-        config: { thinkingConfig: { thinkingBudget: 0 } }
-      });
-
-      res.json({ text: response.text || '' });
+      const text = await callGroq([{ role: "user", content: prompt }], 0.8);
+      res.json({ text });
     } catch (error: any) {
       console.error('Simulate error:', error);
       res.status(500).json({ error: error.message || 'Erro na simulacao' });
@@ -1282,13 +1389,12 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     }
   });
 
-  // Route: askQuestion
+  // Route: askQuestion — via Groq (pura geração de texto, sem web search)
   app.post('/api/gemini/askQuestion', async (req, res) => {
     try {
       const { lead, question, history } = req.body;
-      const ai = getGeminiClient();
 
-      const context = `
+      const systemPrompt = `
         LEAD CONTEXT:
         Hotel Name: ${lead.companyName}
         Website: ${lead.website || "None"}
@@ -1297,27 +1403,21 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         Diagnosis: ${lead.diagnosis}
         Reviews: ${lead.mapsRating} stars (${lead.mapsReviews} reviews)
         Notas de Contacto: ${lead.contactNotes || "Nenhuma nota inserida"}
-      `;
 
-      const chatHistory = history.map((h: any) => `${h.role === 'user' ? 'User' : 'AI'}: ${h.content}`).join('\n');
+        TASK: Responde de forma focada e assertiva sobre as oportunidades de vender o sistema de governacao / housekeeping SOL para este hotel. Sugere taticas de abordagem ou mensagens concretas. Responde sempre em Portugues de Portugal (PT-PT).
+      `.trim();
 
-      const prompt = `
-        ${context}
-        
-        PREVIOUS CHAT:
-        ${chatHistory}
-        
-        USER QUESTION: "${question}"
-        
-        TASK: Responda de forma focada e assertiva sobre as oportunidades de vender o sistema de governação / housekeeping para este hotel. Sugira táticas de abordagem frias ou mensagens.
-        Language: Portuguese (Portugal).
-      `;
+      const messages: Array<{ role: string; content: string }> = [
+        { role: "system", content: systemPrompt },
+        ...((Array.isArray(history) ? history : []) as any[]).map((h: any) => ({
+          role: h.role === 'user' ? 'user' : 'assistant',
+          content: h.content,
+        })),
+        { role: "user", content: question },
+      ];
 
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: prompt
-      });
-      res.json({ text: response.text || "Sem resposta." });
+      const text = await callGroq(messages, 0.6);
+      res.json({ text: text || "Sem resposta." });
     } catch (error: any) {
       console.error("AskQuestion error:", error);
       res.status(500).json({ error: error.message || "Error asking question to AI" });

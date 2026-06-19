@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Copy, Mail, MessageCircle, MessagesSquare, X } from 'lucide-react';
+import { Check, Copy, Loader2, Mail, MessageCircle, MessagesSquare, Send, X } from 'lucide-react';
 import { Lead } from '../types';
+import { sendTemplateEmail } from '../services/emailService';
 
 interface MessageTemplatesProps {
   lead: Lead;
   onClose: () => void;
+  sellerId?: string;
 }
 
 type Channel = 'email' | 'whatsapp' | 'linkedin';
@@ -80,7 +82,7 @@ const channelMeta: Record<Channel, { label: string; tone: string }> = {
   linkedin: { label: 'LinkedIn', tone: 'text-blue-300' }
 };
 
-export default function MessageTemplates({ lead, onClose }: MessageTemplatesProps) {
+export default function MessageTemplates({ lead, onClose, sellerId }: MessageTemplatesProps) {
   const name = firstName(lead);
   const [activeKey, setActiveKey] = useState(TEMPLATES[0].key);
   const active = useMemo(() => TEMPLATES.find((t) => t.key === activeKey) || TEMPLATES[0], [activeKey]);
@@ -90,6 +92,9 @@ export default function MessageTemplates({ lead, onClose }: MessageTemplatesProp
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
   const [copied, setCopied] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendStatus, setSendStatus] = useState<'idle' | 'sent' | 'error'>('idle');
+  const [sendError, setSendError] = useState('');
 
   const selectTemplate = (key: string) => {
     const t = TEMPLATES.find((x) => x.key === key) || TEMPLATES[0];
@@ -97,6 +102,31 @@ export default function MessageTemplates({ lead, onClose }: MessageTemplatesProp
     setSubject(t.subject ? t.subject(lead, name) : '');
     setBody(t.body(lead, name));
     setCopied(false);
+    setSendStatus('idle');
+    setSendError('');
+  };
+
+  const handleSendEmail = async () => {
+    if (!lead.email) return;
+    setSending(true);
+    setSendStatus('idle');
+    setSendError('');
+    const result = await sendTemplateEmail({
+      to: lead.email,
+      toName: lead.contactPerson || lead.companyName,
+      subject,
+      body,
+      leadId: lead.id,
+      sellerId,
+      hotelName: lead.companyName,
+    });
+    setSending(false);
+    if (result.success) {
+      setSendStatus('sent');
+    } else {
+      setSendStatus('error');
+      setSendError(result.error || 'Erro desconhecido');
+    }
   };
 
   const handleCopy = async () => {
@@ -150,16 +180,50 @@ export default function MessageTemplates({ lead, onClose }: MessageTemplatesProp
             </label>
           </div>
 
-          <footer className="flex items-center justify-end gap-2 border-t border-gray-800 px-5 py-3">
-            <button onClick={handleCopy} className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-gray-700">
-              {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />} {copied ? 'Copiado' : 'Copiar'}
-            </button>
-            {active.channel === 'email' && lead.email && (
-              <a href={emailHref} className="flex items-center gap-1.5 rounded-lg bg-sky-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-sky-500"><Mail className="h-4 w-4" /> Abrir email</a>
-            )}
-            {(active.channel === 'whatsapp' || active.channel === 'linkedin') && lead.phone && (
-              <a href={whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-green-500"><MessageCircle className="h-4 w-4" /> Abrir WhatsApp</a>
-            )}
+          <footer className="flex items-center justify-between gap-2 border-t border-gray-800 px-5 py-3">
+            {/* feedback de envio */}
+            <div className="text-xs">
+              {sendStatus === 'sent' && (
+                <span className="flex items-center gap-1.5 text-emerald-400"><Check className="h-4 w-4" /> Email enviado e registado no CRM</span>
+              )}
+              {sendStatus === 'error' && (
+                <span className="text-rose-400">{sendError}</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button onClick={handleCopy} className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-gray-700">
+                {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />} {copied ? 'Copiado' : 'Copiar'}
+              </button>
+
+              {active.channel === 'email' && lead.email && (
+                <>
+                  {/* fallback: abrir no cliente de email */}
+                  <a href={emailHref} className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-gray-700" title="Abrir no cliente de email">
+                    <Mail className="h-4 w-4" /> Abrir
+                  </a>
+                  {/* envio direto via Brevo */}
+                  <button
+                    onClick={handleSendEmail}
+                    disabled={sending || sendStatus === 'sent'}
+                    className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-bold text-white transition disabled:opacity-60 ${sendStatus === 'sent' ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-500'}`}
+                  >
+                    {sending
+                      ? <><Loader2 className="h-4 w-4 animate-spin" /> A enviar...</>
+                      : sendStatus === 'sent'
+                        ? <><Check className="h-4 w-4" /> Enviado</>
+                        : <><Send className="h-4 w-4" /> Enviar via Brevo</>
+                    }
+                  </button>
+                </>
+              )}
+
+              {(active.channel === 'whatsapp' || active.channel === 'linkedin') && lead.phone && (
+                <a href={whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg bg-green-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-green-500">
+                  <MessageCircle className="h-4 w-4" /> Abrir WhatsApp
+                </a>
+              )}
+            </div>
           </footer>
         </div>
       </div>
