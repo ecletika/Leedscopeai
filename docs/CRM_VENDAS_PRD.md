@@ -1564,3 +1564,15 @@ Solucao final:
 - Validado em producao: `/api/gemini/health` devolve JSON; `/api/gemini/searchLeads` devolve leads reais (RNET) mesmo sem GEMINI_API_KEY (fallback).
 
 Pendente (config na Vercel, do lado do cliente): definir `GEMINI_API_KEY` (features de IA) e `SUPABASE_ROLE_KEY` (criar contas de vendedor). O frontend liga ao Supabase via chave anon embutida.
+
+### 2026-06-20 - Email: copia (BCC) e recepcao
+
+Diagnostico: o envio via Brevo JA funcionava (devolve messageId). Faltava (1) BCC para o remetente receber copia e (2) a copia em "Enviados" so era guardada se houvesse sellerId.
+
+Correcao:
+
+- `/api/email/send` passa a fazer BCC para o vendedor (lookup por sellerId em app_users) e para um endereco de copia `EMAIL_COPY_TO` (default: remetente comercial). Define reply-to para o vendedor.
+- `Dashboard` passa `sellerId={currentSeller?.id ?? currentUser.id}` ao MessageTemplates, para a copia em "Enviados" (Drive) ser guardada tambem com admin.
+- `.env.local`: adicionado `EMAIL_COPY_TO=ecletikaportugal@gmail.com`.
+
+Acoes na Vercel: definir `EMAIL_COPY_TO` (para receber copia na Gmail) e confirmar autenticacao do dominio remetente no Brevo (SPF/DKIM) para deliverability/spam.

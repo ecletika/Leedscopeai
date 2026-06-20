@@ -1066,12 +1066,23 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   app.post('/api/emails/folder', async (req, res) => {
     const { sellerId, name } = req.body as { sellerId?: string; name?: string };
     if (!sellerId || !name) return res.status(400).json({ error: 'sellerId e name obrigatórios' });
+    if (!isDriveConfigured()) return res.status(500).json({ error: 'Google Drive não configurado no servidor' });
     try {
       const supabase = getSupabaseAdmin();
       if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
-      const { data: user } = await supabase.from('app_users').select('drive_folder_id').eq('id', sellerId).maybeSingle();
-      if (!user?.drive_folder_id) return res.status(404).json({ error: 'Pasta raiz do vendedor não encontrada' });
-      const folderId = await createDriveFolder(name.trim(), user.drive_folder_id);
+      const { data: user } = await supabase.from('app_users').select('name, drive_folder_id').eq('id', sellerId).maybeSingle();
+
+      // Auto-provisiona a pasta raiz do vendedor se ainda nao existir
+      let rootId: string | null = user?.drive_folder_id ?? null;
+      if (!rootId) {
+        const rawName: string = (user as { name?: string } | null)?.name ?? sellerId;
+        const prefix = rawName.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '').slice(0, 40) || 'vendedor';
+        const folders = await createSellerFolders(prefix);
+        await supabase.from('app_users').update({ drive_folder_id: folders.rootId, drive_inbox_id: folders.inboxId, drive_sent_id: folders.sentId }).eq('id', sellerId);
+        rootId = folders.rootId;
+      }
+
+      const folderId = await createDriveFolder(name.trim(), rootId);
       res.json({ id: folderId, name: name.trim() });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

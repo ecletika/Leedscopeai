@@ -130722,12 +130722,20 @@ LeadScope AI - Oportunidade gerada a ${(/* @__PURE__ */ new Date()).toLocaleDate
   app2.post("/api/emails/folder", async (req, res) => {
     const { sellerId, name } = req.body;
     if (!sellerId || !name) return res.status(400).json({ error: "sellerId e name obrigat\xF3rios" });
+    if (!isDriveConfigured()) return res.status(500).json({ error: "Google Drive n\xE3o configurado no servidor" });
     try {
       const supabase = getSupabaseAdmin();
       if (!supabase) return res.status(500).json({ error: "Supabase n\xE3o configurado" });
-      const { data: user } = await supabase.from("app_users").select("drive_folder_id").eq("id", sellerId).maybeSingle();
-      if (!user?.drive_folder_id) return res.status(404).json({ error: "Pasta raiz do vendedor n\xE3o encontrada" });
-      const folderId = await createDriveFolder(name.trim(), user.drive_folder_id);
+      const { data: user } = await supabase.from("app_users").select("name, drive_folder_id").eq("id", sellerId).maybeSingle();
+      let rootId = user?.drive_folder_id ?? null;
+      if (!rootId) {
+        const rawName = user?.name ?? sellerId;
+        const prefix = rawName.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, ".").replace(/[^a-z0-9.]/g, "").slice(0, 40) || "vendedor";
+        const folders = await createSellerFolders(prefix);
+        await supabase.from("app_users").update({ drive_folder_id: folders.rootId, drive_inbox_id: folders.inboxId, drive_sent_id: folders.sentId }).eq("id", sellerId);
+        rootId = folders.rootId;
+      }
+      const folderId = await createDriveFolder(name.trim(), rootId);
       res.json({ id: folderId, name: name.trim() });
     } catch (err) {
       res.status(500).json({ error: err.message });
