@@ -1008,24 +1008,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     } catch { res.json([]); }
   });
 
-  app.get('/api/emails/:fileId', async (req, res) => {
-    try {
-      const email = await readDriveFile(req.params.fileId);
-      res.json(email);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
-
-  // list files in a custom Drive folder
-  app.get('/api/emails/folder/:folderId', async (req, res) => {
-    try {
-      const files = await listFilesInFolder(req.params.folderId);
-      res.json(files);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
-  });
+  // specific routes BEFORE parameterised :fileId — Express matches in order
 
   // list custom subfolders for a seller (excludes Inbox / Enviados)
   app.get('/api/emails/folders', async (req, res) => {
@@ -1039,13 +1022,20 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         .select('drive_folder_id')
         .eq('id', sellerId)
         .maybeSingle();
-      // Column may not exist yet (pending migration) — return empty list gracefully
       if (dbErr || !user?.drive_folder_id) return res.json([]);
       const all = await listSubfoldersInFolder(user.drive_folder_id);
       const custom = all.filter((f) => f.name !== 'Inbox' && f.name !== 'Enviados');
       res.json(custom);
+    } catch { res.json([]); }
+  });
+
+  // list files in a custom Drive folder
+  app.get('/api/emails/folder/:folderId', async (req, res) => {
+    try {
+      const files = await listFilesInFolder(req.params.folderId);
+      res.json(files);
     } catch (err: any) {
-      res.json([]); // never crash the UI — folders are optional
+      res.status(500).json({ error: err.message });
     }
   });
 
@@ -1056,10 +1046,20 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     try {
       const supabase = getSupabaseAdmin();
       if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
-      const { data: user } = await supabase.from('app_users').select('drive_folder_id').eq('id', sellerId).single();
+      const { data: user } = await supabase.from('app_users').select('drive_folder_id').eq('id', sellerId).maybeSingle();
       if (!user?.drive_folder_id) return res.status(404).json({ error: 'Pasta raiz do vendedor não encontrada' });
       const folderId = await createDriveFolder(name.trim(), user.drive_folder_id);
       res.json({ id: folderId, name: name.trim() });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // parameterised :fileId MUST be last — matches anything that didn't match above
+  app.get('/api/emails/:fileId', async (req, res) => {
+    try {
+      const email = await readDriveFile(req.params.fileId);
+      res.json(email);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
