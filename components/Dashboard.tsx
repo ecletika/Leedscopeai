@@ -1541,19 +1541,11 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
         )}
 
         {/* --- CAIXA DE EMAIL (Drive) --- */}
-        {showEmailInbox && currentSeller?.id && (
+        {showEmailInbox && (
             <EmailInbox
-                sellerId={currentSeller.id}
+                sellerId={currentSeller?.id ?? currentUser.id}
                 onClose={() => setShowEmailInbox(false)}
             />
-        )}
-        {showEmailInbox && !currentSeller?.id && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-                <div className="rounded-xl border border-gray-700 bg-ai-card p-6 text-center">
-                    <p className="text-sm text-gray-400">Perfil de vendedor não encontrado para este utilizador.</p>
-                    <button onClick={() => setShowEmailInbox(false)} className="mt-4 rounded-lg bg-gray-700 px-4 py-2 text-xs text-white hover:bg-gray-600">Fechar</button>
-                </div>
-            </div>
         )}
 
         {/* --- QUALIFICACAO DO LEAD (M34) --- */}
