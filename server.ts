@@ -932,6 +932,52 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     }
   });
 
+  // ── Email Drive setup (auto-creates folders for sellers without them) ────────
+
+  app.post('/api/emails/setup-drive', async (req, res) => {
+    const { sellerId } = req.body as { sellerId?: string };
+    if (!sellerId) return res.status(400).json({ error: 'sellerId obrigatório' });
+    if (!isDriveConfigured()) return res.json({ skipped: true, reason: 'Drive não configurado' });
+
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.json({ skipped: true, reason: 'Supabase não configurado' });
+
+      const { data: user } = await supabase
+        .from('app_users')
+        .select('name, drive_folder_id, drive_inbox_id, drive_sent_id')
+        .eq('id', sellerId)
+        .maybeSingle();
+
+      // Already set up — nothing to do
+      if (user?.drive_folder_id && user?.drive_inbox_id && user?.drive_sent_id) {
+        return res.json({ ok: true, alreadySetup: true });
+      }
+
+      const rawName: string = (user as { name?: string } | null)?.name ?? sellerId;
+      const prefix = rawName
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/\s+/g, '.')
+        .replace(/[^a-z0-9.]/g, '')
+        .slice(0, 40) || 'vendedor';
+
+      const folders = await createSellerFolders(prefix);
+      await supabase.from('app_users').update({
+        drive_folder_id: folders.rootId,
+        drive_inbox_id: folders.inboxId,
+        drive_sent_id: folders.sentId,
+      }).eq('id', sellerId);
+
+      console.log(`[Drive] ✅ Pastas criadas para ${rawName} (${sellerId}): ${JSON.stringify(folders)}`);
+      res.json({ ok: true, folders });
+    } catch (err: any) {
+      console.error('[Drive] setup-drive error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ── Email Drive endpoints ──────────────────────────────────────────────────
 
   app.get('/api/emails/inbox', async (req, res) => {

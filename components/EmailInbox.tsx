@@ -84,6 +84,16 @@ export function EmailInbox({ sellerId }: EmailInboxProps) {
   const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
 
+  // ── Auto-setup Drive folders on first open ────────────────────────────────
+
+  useEffect(() => {
+    fetch('/api/emails/setup-drive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sellerId }),
+    }).catch(() => { /* silent */ });
+  }, [sellerId]);
+
   // ── Load custom folders ────────────────────────────────────────────────────
 
   const loadFolders = useCallback(async () => {
