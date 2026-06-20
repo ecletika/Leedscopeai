@@ -881,18 +881,42 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
           if (supabase) {
             const { data: seller } = await supabase
               .from('app_users')
-              .select('drive_sent_id')
+              .select('name, drive_sent_id')
               .eq('id', sellerId)
               .maybeSingle();
-            if (seller?.drive_sent_id) {
+
+            let sentFolderId: string | null = seller?.drive_sent_id ?? null;
+
+            // Auto-setup: create Drive folders if this seller has none yet
+            if (!sentFolderId) {
+              const rawName: string = (seller as { name?: string } | null)?.name ?? sellerId;
+              const prefix = rawName
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[̀-ͯ]/g, '')
+                .replace(/\s+/g, '.')
+                .replace(/[^a-z0-9.]/g, '')
+                .slice(0, 40) || 'vendedor';
+              const folders = await createSellerFolders(prefix);
+              await supabase.from('app_users').update({
+                drive_folder_id: folders.rootId,
+                drive_inbox_id: folders.inboxId,
+                drive_sent_id: folders.sentId,
+              }).eq('id', sellerId);
+              sentFolderId = folders.sentId;
+              console.log(`[Drive] ✅ Pastas criadas automaticamente para ${sellerId}`);
+            }
+
+            if (sentFolderId) {
               const ts = new Date().toISOString().replace(/[:.]/g, '-');
               const filename = `${ts}_${(to.split('@')[0] || 'destinatario').slice(0, 30)}.json`;
-              await saveFileToDrive(seller.drive_sent_id, filename, {
+              await saveFileToDrive(sentFolderId, filename, {
                 type: 'sent', from: fromEmail, to, subject,
                 body, sentAt: new Date().toISOString(),
                 leadId: leadId || null, hotelName: hotelName || null,
                 brevoMessageId: messageId, read: true,
               });
+              console.log(`[Drive] ✅ Cópia guardada em Enviados (${sentFolderId})`);
             }
           }
         } catch (driveErr: any) {
