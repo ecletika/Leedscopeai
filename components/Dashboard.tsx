@@ -16,6 +16,7 @@ import PlayMode from './PlayMode';
 import DemoMode from './DemoMode';
 import MessageTemplates from './MessageTemplates';
 import QualificationModal from './QualificationModal';
+import { EmailInbox } from './EmailInbox';
 import SalesTools from './SalesTools';
 import ProposalBuilder from './ProposalBuilder';
 import ThemeToggle from './ThemeToggle';
@@ -75,6 +76,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   const [activeLeadForPlay, setActiveLeadForPlay] = useState<Lead | null>(null);
   const [activeLeadForDemo, setActiveLeadForDemo] = useState<Lead | null>(null);
   const [activeLeadForMessages, setActiveLeadForMessages] = useState<Lead | null>(null);
+  const [showEmailInbox, setShowEmailInbox] = useState(false);
   const [activeLeadForQualify, setActiveLeadForQualify] = useState<Lead | null>(null);
   const [activeLeadForProposalBuilder, setActiveLeadForProposalBuilder] = useState<Lead | null>(null);
   const [crmSellers, setCrmSellers] = useState<CrmSeller[]>([]);
@@ -670,6 +672,13 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'academy' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
             >
                 <GraduationCap className="w-4 h-4" /> Academia SOL
+            </button>
+
+            <button
+                onClick={() => setShowEmailInbox(true)}
+                className="w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent"
+            >
+                <Mail className="w-4 h-4" /> Caixa de Email
             </button>
 
             <button
@@ -1529,6 +1538,22 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 onClose={() => setActiveLeadForMessages(null)}
                 sellerId={currentSeller?.id}
             />
+        )}
+
+        {/* --- CAIXA DE EMAIL (Drive) --- */}
+        {showEmailInbox && currentSeller?.id && (
+            <EmailInbox
+                sellerId={currentSeller.id}
+                onClose={() => setShowEmailInbox(false)}
+            />
+        )}
+        {showEmailInbox && !currentSeller?.id && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+                <div className="rounded-xl border border-gray-700 bg-ai-card p-6 text-center">
+                    <p className="text-sm text-gray-400">Perfil de vendedor não encontrado para este utilizador.</p>
+                    <button onClick={() => setShowEmailInbox(false)} className="mt-4 rounded-lg bg-gray-700 px-4 py-2 text-xs text-white hover:bg-gray-600">Fechar</button>
+                </div>
+            </div>
         )}
 
         {/* --- QUALIFICACAO DO LEAD (M34) --- */}
