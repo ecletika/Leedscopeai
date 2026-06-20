@@ -18919,14 +18919,14 @@ var require_etag = __commonJS({
   "node_modules/etag/index.js"(exports2, module2) {
     "use strict";
     module2.exports = etag;
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var Stats = require("fs").Stats;
     var toString = Object.prototype.toString;
     function entitytag(entity) {
       if (entity.length === 0) {
         return '"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk"';
       }
-      var hash = crypto3.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
+      var hash = crypto4.createHash("sha1").update(entity, "utf8").digest("base64").substring(0, 27);
       var len = typeof entity === "string" ? Buffer.byteLength(entity, "utf8") : entity.length;
       return '"' + len.toString(16) + "-" + hash + '"';
     }
@@ -22401,17 +22401,17 @@ var require_content_disposition = __commonJS({
 // node_modules/cookie-signature/index.js
 var require_cookie_signature = __commonJS({
   "node_modules/cookie-signature/index.js"(exports2) {
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     exports2.sign = function(val, secret) {
       if ("string" != typeof val) throw new TypeError("Cookie value must be provided as a string.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
-      return val + "." + crypto3.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
+      return val + "." + crypto4.createHmac("sha256", secret).update(val).digest("base64").replace(/\=+$/, "");
     };
     exports2.unsign = function(input, secret) {
       if ("string" != typeof input) throw new TypeError("Signed cookie string must be provided.");
       if (null == secret) throw new TypeError("Secret key must be provided.");
       var tentativeValue = input.slice(0, input.lastIndexOf(".")), expectedInput = exports2.sign(tentativeValue, secret), expectedBuffer = Buffer.from(expectedInput), inputBuffer = Buffer.from(input);
-      return expectedBuffer.length === inputBuffer.length && crypto3.timingSafeEqual(expectedBuffer, inputBuffer) ? tentativeValue : false;
+      return expectedBuffer.length === inputBuffer.length && crypto4.timingSafeEqual(expectedBuffer, inputBuffer) ? tentativeValue : false;
     };
   }
 });
@@ -28618,7 +28618,7 @@ var require_le_unix = __commonJS({
 var require_mime_node = __commonJS({
   "node_modules/nodemailer/lib/mime-node/index.js"(exports2, module2) {
     "use strict";
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var fs4 = require("fs");
     var punycode = require_punycode();
     var { PassThrough: PassThrough3 } = require("stream");
@@ -28637,7 +28637,7 @@ var require_mime_node = __commonJS({
       constructor(contentType, options) {
         this.nodeCounter = 0;
         options = options || {};
-        this.baseBoundary = options.baseBoundary || crypto3.randomBytes(8).toString("hex");
+        this.baseBoundary = options.baseBoundary || crypto4.randomBytes(8).toString("hex");
         this.boundaryPrefix = options.boundaryPrefix || "--_NmP";
         this.disableFileAccess = !!options.disableFileAccess;
         this.disableUrlAccess = !!options.disableUrlAccess;
@@ -29596,8 +29596,8 @@ var require_mime_node = __commonJS({
       _generateMessageId() {
         return "<" + [2, 2, 2, 6].reduce(
           // crux to generate UUID-like random strings
-          (prev, len) => prev + "-" + crypto3.randomBytes(len).toString("hex"),
-          crypto3.randomBytes(4).toString("hex")
+          (prev, len) => prev + "-" + crypto4.randomBytes(len).toString("hex"),
+          crypto4.randomBytes(4).toString("hex")
         ) + "@" + // try to use the domain of the FROM address or fallback to server hostname
         (this.getEnvelope().from || this.hostname || "localhost").split("@").pop() + ">";
       }
@@ -30192,14 +30192,14 @@ var require_relaxed_body = __commonJS({
   "node_modules/nodemailer/lib/dkim/relaxed-body.js"(exports2, module2) {
     "use strict";
     var { Transform } = require("stream");
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var RelaxedBody = class extends Transform {
       constructor(options) {
         super();
         options = options || {};
         this.chunkBuffer = [];
         this.chunkBufferLen = 0;
-        this.bodyHash = crypto3.createHash(options.hashAlgo || "sha1");
+        this.bodyHash = crypto4.createHash(options.hashAlgo || "sha1");
         this.remainder = "";
         this.byteLength = 0;
         this.debug = options.debug;
@@ -30302,7 +30302,7 @@ var require_sign2 = __commonJS({
     "use strict";
     var punycode = require_punycode();
     var mimeFuncs = require_mime_funcs();
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     module2.exports = (headers, hashAlgo, bodyHash, options) => {
       options = options || {};
       const defaultFieldNames = "From:Sender:Reply-To:Subject:Date:Message-ID:To:Cc:MIME-Version:Content-Type:Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:List-Id:List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive";
@@ -30310,7 +30310,7 @@ var require_sign2 = __commonJS({
       const canonicalizedHeaderData = relaxedHeaders(headers, fieldNames, options.skipFields);
       const dkimHeader = generateDKIMHeader(options.domainName, options.keySelector, canonicalizedHeaderData.fieldNames, hashAlgo, bodyHash);
       canonicalizedHeaderData.headers += "dkim-signature:" + relaxedHeaderLine(dkimHeader);
-      const signer = crypto3.createSign(("rsa-" + hashAlgo).toUpperCase());
+      const signer = crypto4.createSign(("rsa-" + hashAlgo).toUpperCase());
       signer.update(canonicalizedHeaderData.headers);
       let signature;
       try {
@@ -30379,7 +30379,7 @@ var require_dkim = __commonJS({
     var { PassThrough: PassThrough3 } = require("stream");
     var fs4 = require("fs");
     var path3 = require("path");
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var DKIM_ALGO = "sha256";
     var MAX_MESSAGE_SIZE = 2 * 1024 * 1024;
     var DKIMSigner = class {
@@ -30392,7 +30392,7 @@ var require_dkim = __commonJS({
         this.chunks = [];
         this.chunklen = 0;
         this.readPos = 0;
-        this.cachePath = this.cacheDir ? path3.join(this.cacheDir, "message." + Date.now() + "-" + crypto3.randomBytes(14).toString("hex")) : false;
+        this.cachePath = this.cacheDir ? path3.join(this.cacheDir, "message." + Date.now() + "-" + crypto4.randomBytes(14).toString("hex")) : false;
         this.cache = false;
         this.headers = false;
         this.bodyHash = false;
@@ -30943,7 +30943,7 @@ var require_mailer = __commonJS({
     var MailMessage = require_mail_message();
     var net = require("net");
     var dns = require("dns");
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var Mail = class extends EventEmitter {
       constructor(transporter, options, defaults) {
         super();
@@ -31286,7 +31286,7 @@ var require_mailer = __commonJS({
             html = (html || "").toString().replace(
               /(<img\b[^<>]{0,1024} src\s{0,20}=[\s"']{0,20})(data:([^;]+);[^"'>\s]+)/gi,
               (match, prefix, dataUri, mimeType) => {
-                const cid = crypto3.randomBytes(10).toString("hex") + "@localhost";
+                const cid = crypto4.randomBytes(10).toString("hex") + "@localhost";
                 if (!mail.data.attachments) {
                   mail.data.attachments = [];
                 }
@@ -31413,7 +31413,7 @@ var require_smtp_connection = __commonJS({
     var net = require("net");
     var tls = require("tls");
     var os = require("os");
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var DataStream = require_data_stream();
     var { PassThrough: PassThrough3 } = require("stream");
     var shared = require_shared();
@@ -31433,7 +31433,7 @@ var require_smtp_connection = __commonJS({
     var SMTPConnection = class extends EventEmitter {
       constructor(options) {
         super(options);
-        this.id = crypto3.randomBytes(8).toString("base64").replace(/\W/g, "");
+        this.id = crypto4.randomBytes(8).toString("base64").replace(/\W/g, "");
         this.stage = "init";
         this.options = options || {};
         this.secureConnection = !!this.options.secure;
@@ -32593,7 +32593,7 @@ var require_smtp_connection = __commonJS({
           );
         }
         const base64decoded = Buffer.from(challengeMatch[1], "base64").toString("ascii");
-        const hmacMD5 = crypto3.createHmac("md5", this._auth.credentials.pass);
+        const hmacMD5 = crypto4.createHmac("md5", this._auth.credentials.pass);
         hmacMD5.update(base64decoded);
         const prepended = this._auth.credentials.user + " " + hmacMD5.digest("hex");
         this._responseActions.push((str2) => {
@@ -32886,7 +32886,7 @@ var require_xoauth2 = __commonJS({
     "use strict";
     var { Stream: Stream4 } = require("stream");
     var nmfetch = require_fetch();
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var shared = require_shared();
     var errors = require_errors();
     var XOAuth2 = class extends Stream4 {
@@ -33232,7 +33232,7 @@ var require_xoauth2 = __commonJS({
        */
       jwtSignRS256(payload) {
         payload = ['{"alg":"RS256","typ":"JWT"}', JSON.stringify(payload)].map((val) => this.toBase64URL(val)).join(".");
-        const signature = crypto3.createSign("RSA-SHA256").update(payload).sign(this.options.privateKey);
+        const signature = crypto4.createSign("RSA-SHA256").update(payload).sign(this.options.privateKey);
         return payload + "." + this.toBase64URL(signature);
       }
     };
@@ -46629,22 +46629,22 @@ var require_crypto2 = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.NodeCrypto = void 0;
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var NodeCrypto = class {
       async sha256DigestBase64(str) {
-        return crypto3.createHash("sha256").update(str).digest("base64");
+        return crypto4.createHash("sha256").update(str).digest("base64");
       }
       randomBytesBase64(count) {
-        return crypto3.randomBytes(count).toString("base64");
+        return crypto4.randomBytes(count).toString("base64");
       }
       async verify(pubkey, data, signature) {
-        const verifier = crypto3.createVerify("RSA-SHA256");
+        const verifier = crypto4.createVerify("RSA-SHA256");
         verifier.update(data);
         verifier.end();
         return verifier.verify(pubkey, signature, "base64");
       }
       async sign(privateKey, data) {
-        const signer = crypto3.createSign("RSA-SHA256");
+        const signer = crypto4.createSign("RSA-SHA256");
         signer.update(data);
         signer.end();
         return signer.sign(privateKey, "base64");
@@ -46662,7 +46662,7 @@ var require_crypto2 = __commonJS({
        *   string in hexadecimal encoding.
        */
       async sha256DigestHex(str) {
-        return crypto3.createHash("sha256").update(str).digest("hex");
+        return crypto4.createHash("sha256").update(str).digest("hex");
       }
       /**
        * Computes the HMAC hash of a message using the provided crypto key and the
@@ -46674,7 +46674,7 @@ var require_crypto2 = __commonJS({
        */
       async signWithHmacSha256(key, msg) {
         const cryptoKey = typeof key === "string" ? key : toBuffer(key);
-        return toArrayBuffer(crypto3.createHmac("sha256", cryptoKey).update(msg).digest());
+        return toArrayBuffer(crypto4.createHmac("sha256", cryptoKey).update(msg).digest());
       }
     };
     exports2.NodeCrypto = NodeCrypto;
@@ -47587,10 +47587,10 @@ var require_oauth2client = __commonJS({
        * https://github.com/googleapis/google-auth-library-nodejs/blob/main/samples/oauth2-codeVerifier.js
        */
       async generateCodeVerifierAsync() {
-        const crypto3 = (0, crypto_1.createCrypto)();
-        const randomString = crypto3.randomBytesBase64(96);
+        const crypto4 = (0, crypto_1.createCrypto)();
+        const randomString = crypto4.randomBytesBase64(96);
         const codeVerifier = randomString.replace(/\+/g, "~").replace(/=/g, "_").replace(/\//g, "-");
-        const unencodedCodeChallenge = await crypto3.sha256DigestBase64(codeVerifier);
+        const unencodedCodeChallenge = await crypto4.sha256DigestBase64(codeVerifier);
         const codeChallenge = unencodedCodeChallenge.split("=")[0].replace(/\+/g, "-").replace(/\//g, "_");
         return { codeVerifier, codeChallenge };
       }
@@ -48031,7 +48031,7 @@ var require_oauth2client = __commonJS({
        * @return Returns a promise resolving to LoginTicket on verification.
        */
       async verifySignedJwtWithCertsAsync(jwt, certs, requiredAudience, issuers, maxExpiry) {
-        const crypto3 = (0, crypto_1.createCrypto)();
+        const crypto4 = (0, crypto_1.createCrypto)();
         if (!maxExpiry) {
           maxExpiry = _OAuth2Client.DEFAULT_MAX_TOKEN_LIFETIME_SECS_;
         }
@@ -48044,7 +48044,7 @@ var require_oauth2client = __commonJS({
         let envelope;
         let payload;
         try {
-          envelope = JSON.parse(crypto3.decodeBase64StringUtf8(segments[0]));
+          envelope = JSON.parse(crypto4.decodeBase64StringUtf8(segments[0]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token envelope: ${segments[0]}': ${err.message}`;
@@ -48055,7 +48055,7 @@ var require_oauth2client = __commonJS({
           throw new Error("Can't parse token envelope: " + segments[0]);
         }
         try {
-          payload = JSON.parse(crypto3.decodeBase64StringUtf8(segments[1]));
+          payload = JSON.parse(crypto4.decodeBase64StringUtf8(segments[1]));
         } catch (err) {
           if (err instanceof Error) {
             err.message = `Can't parse token payload '${segments[0]}`;
@@ -48072,7 +48072,7 @@ var require_oauth2client = __commonJS({
         if (envelope.alg === "ES256") {
           signature = formatEcdsa.joseToDer(signature, "ES256").toString("base64");
         }
-        const verified = await crypto3.verify(cert, signed, signature);
+        const verified = await crypto4.verify(cert, signed, signature);
         if (!verified) {
           throw new Error("Invalid token signature: " + jwt);
         }
@@ -48447,14 +48447,14 @@ var require_buffer_equal_constant_time = __commonJS({
 var require_jwa = __commonJS({
   "node_modules/jwa/index.js"(exports2, module2) {
     var Buffer4 = require_safe_buffer().Buffer;
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var formatEcdsa = require_ecdsa_sig_formatter();
     var util = require("util");
     var MSG_INVALID_ALGORITHM = '"%s" is not a valid algorithm.\n  Supported algorithms are:\n  "HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512" and "none".';
     var MSG_INVALID_SECRET = "secret must be a string or buffer";
     var MSG_INVALID_VERIFIER_KEY = "key must be a string or a buffer";
     var MSG_INVALID_SIGNER_KEY = "key must be a string, a buffer or an object";
-    var supportsKeyObjects = typeof crypto3.createPublicKey === "function";
+    var supportsKeyObjects = typeof crypto4.createPublicKey === "function";
     if (supportsKeyObjects) {
       MSG_INVALID_VERIFIER_KEY += " or a KeyObject";
       MSG_INVALID_SECRET += "or a KeyObject";
@@ -48544,17 +48544,17 @@ var require_jwa = __commonJS({
       return function sign(thing, secret) {
         checkIsSecretKey(secret);
         thing = normalizeInput(thing);
-        var hmac = crypto3.createHmac("sha" + bits, secret);
+        var hmac = crypto4.createHmac("sha" + bits, secret);
         var sig = (hmac.update(thing), hmac.digest("base64"));
         return fromBase64(sig);
       };
     }
     var bufferEqual;
-    var timingSafeEqual = "timingSafeEqual" in crypto3 ? function timingSafeEqual2(a, b) {
+    var timingSafeEqual = "timingSafeEqual" in crypto4 ? function timingSafeEqual2(a, b) {
       if (a.byteLength !== b.byteLength) {
         return false;
       }
-      return crypto3.timingSafeEqual(a, b);
+      return crypto4.timingSafeEqual(a, b);
     } : function timingSafeEqual2(a, b) {
       if (!bufferEqual) {
         bufferEqual = require_buffer_equal_constant_time();
@@ -48571,7 +48571,7 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto3.createSign("RSA-SHA" + bits);
+        var signer = crypto4.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign(privateKey, "base64"));
         return fromBase64(sig);
       };
@@ -48581,7 +48581,7 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto3.createVerify("RSA-SHA" + bits);
+        var verifier = crypto4.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify(publicKey, signature, "base64");
       };
@@ -48590,11 +48590,11 @@ var require_jwa = __commonJS({
       return function sign(thing, privateKey) {
         checkIsPrivateKey(privateKey);
         thing = normalizeInput(thing);
-        var signer = crypto3.createSign("RSA-SHA" + bits);
+        var signer = crypto4.createSign("RSA-SHA" + bits);
         var sig = (signer.update(thing), signer.sign({
           key: privateKey,
-          padding: crypto3.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto3.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto4.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto4.constants.RSA_PSS_SALTLEN_DIGEST
         }, "base64"));
         return fromBase64(sig);
       };
@@ -48604,12 +48604,12 @@ var require_jwa = __commonJS({
         checkIsPublicKey(publicKey);
         thing = normalizeInput(thing);
         signature = toBase64(signature);
-        var verifier = crypto3.createVerify("RSA-SHA" + bits);
+        var verifier = crypto4.createVerify("RSA-SHA" + bits);
         verifier.update(thing);
         return verifier.verify({
           key: publicKey,
-          padding: crypto3.constants.RSA_PKCS1_PSS_PADDING,
-          saltLength: crypto3.constants.RSA_PSS_SALTLEN_DIGEST
+          padding: crypto4.constants.RSA_PKCS1_PSS_PADDING,
+          saltLength: crypto4.constants.RSA_PSS_SALTLEN_DIGEST
         }, signature, "base64");
       };
     }
@@ -51185,14 +51185,14 @@ var require_awsrequestsigner = __commonJS({
       }
     };
     exports2.AwsRequestSigner = AwsRequestSigner;
-    async function sign(crypto3, key, msg) {
-      return await crypto3.signWithHmacSha256(key, msg);
+    async function sign(crypto4, key, msg) {
+      return await crypto4.signWithHmacSha256(key, msg);
     }
-    async function getSigningKey(crypto3, key, dateStamp, region, serviceName) {
-      const kDate = await sign(crypto3, `AWS4${key}`, dateStamp);
-      const kRegion = await sign(crypto3, kDate, region);
-      const kService = await sign(crypto3, kRegion, serviceName);
-      const kSigning = await sign(crypto3, kService, "aws4_request");
+    async function getSigningKey(crypto4, key, dateStamp, region, serviceName) {
+      const kDate = await sign(crypto4, `AWS4${key}`, dateStamp);
+      const kRegion = await sign(crypto4, kDate, region);
+      const kService = await sign(crypto4, kRegion, serviceName);
+      const kSigning = await sign(crypto4, kService, "aws4_request");
       return kSigning;
     }
     async function generateAuthenticationHeaderMap(options) {
@@ -52158,7 +52158,7 @@ var require_gdchclient = __commonJS({
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.GdchClient = exports2.GDCH_SERVICE_ACCOUNT_TYPE = void 0;
-    var crypto3 = require("crypto");
+    var crypto4 = require("crypto");
     var fs4 = require("fs");
     var https2 = require("https");
     var oauth2client_1 = require_oauth2client();
@@ -52349,7 +52349,7 @@ var require_gdchclient = __commonJS({
         const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
         const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
         const signingInput = `${encodedHeader}.${encodedPayload}`;
-        const signature = crypto3.sign("sha256", Buffer.from(signingInput), {
+        const signature = crypto4.sign("sha256", Buffer.from(signingInput), {
           key: this.privateKey,
           dsaEncoding: "ieee-p1363"
         });
@@ -53210,24 +53210,24 @@ var require_googleauth = __commonJS({
           const signed = await client.sign(data);
           return signed.signedBlob;
         }
-        const crypto3 = (0, crypto_1.createCrypto)();
+        const crypto4 = (0, crypto_1.createCrypto)();
         if (client instanceof jwtclient_1.JWT && client.key) {
-          const sign = await crypto3.sign(client.key, data);
+          const sign = await crypto4.sign(client.key, data);
           return sign;
         }
         const creds = await this.getCredentials();
         if (!creds.client_email) {
           throw new Error("Cannot sign data without `client_email`.");
         }
-        return this.signBlob(crypto3, creds.client_email, data, endpoint);
+        return this.signBlob(crypto4, creds.client_email, data, endpoint);
       }
-      async signBlob(crypto3, emailOrUniqueId, data, endpoint) {
+      async signBlob(crypto4, emailOrUniqueId, data, endpoint) {
         const url = new URL(endpoint + `${emailOrUniqueId}:signBlob`);
         const res = await this.request({
           method: "POST",
           url: url.href,
           data: {
-            payload: crypto3.encodeBase64StringUtf8(data)
+            payload: crypto4.encodeBase64StringUtf8(data)
           },
           retry: true,
           retryConfig: {
@@ -69993,12 +69993,12 @@ var require_fetch2 = __commonJS({
       return Headers;
     };
     exports2.resolveHeadersConstructor = resolveHeadersConstructor;
-    var fetchWithAuth = (supabaseKey, getAccessToken, customFetch) => {
+    var fetchWithAuth = (supabaseKey, getAccessToken2, customFetch) => {
       const fetch3 = (0, exports2.resolveFetch)(customFetch);
       const HeadersConstructor = (0, exports2.resolveHeadersConstructor)();
       return (input, init) => __awaiter2(void 0, void 0, void 0, function* () {
         var _a2;
-        const accessToken = (_a2 = yield getAccessToken()) !== null && _a2 !== void 0 ? _a2 : supabaseKey;
+        const accessToken = (_a2 = yield getAccessToken2()) !== null && _a2 !== void 0 ? _a2 : supabaseKey;
         let headers = new HeadersConstructor(init === null || init === void 0 ? void 0 : init.headers);
         if (!headers.has("apikey")) {
           headers.set("apikey", supabaseKey);
@@ -111714,7 +111714,7 @@ var import_fs2 = __toESM(require("fs"), 1);
 var import_path = __toESM(require("path"), 1);
 var import_cors = __toESM(require_lib3(), 1);
 var import_nodemailer = __toESM(require_nodemailer(), 1);
-var import_crypto = __toESM(require("crypto"), 1);
+var import_crypto2 = __toESM(require("crypto"), 1);
 
 // node_modules/@google/genai/dist/node/index.mjs
 var import_p_retry = __toESM(require_p_retry(), 1);
@@ -126505,13 +126505,13 @@ var FileSearchStores = class extends BaseModule {
   }
 };
 var uuid4Internal = function() {
-  const { crypto: crypto3 } = globalThis;
-  if (crypto3 === null || crypto3 === void 0 ? void 0 : crypto3.randomUUID) {
-    uuid4Internal = crypto3.randomUUID.bind(crypto3);
-    return crypto3.randomUUID();
+  const { crypto: crypto4 } = globalThis;
+  if (crypto4 === null || crypto4 === void 0 ? void 0 : crypto4.randomUUID) {
+    uuid4Internal = crypto4.randomUUID.bind(crypto4);
+    return crypto4.randomUUID();
   }
   const u8 = new Uint8Array(1);
-  const randomByte = crypto3 ? () => crypto3.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
+  const randomByte = crypto4 ? () => crypto4.getRandomValues(u8)[0] : () => Math.random() * 255 & 255;
   return "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (+c ^ randomByte() & 15 >> +c / 4).toString(16));
 };
 var uuid4 = () => uuid4Internal();
@@ -129755,6 +129755,134 @@ function getApiKeyFromEnv() {
 // server.ts
 var import_supabase_js = __toESM(require_main4(), 1);
 var XLSX = __toESM(require_xlsx(), 1);
+
+// services/googleDriveService.ts
+var import_crypto = __toESM(require("crypto"), 1);
+var CLIENT_EMAIL = process.env.GOOGLE_CLIENT_EMAIL ?? "";
+var PRIVATE_KEY = (process.env.GOOGLE_PRIVATE_KEY ?? "").replace(/\\n/g, "\n");
+var DRIVE_ROOT_FOLDER_ID = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ?? "";
+var tokenCache = null;
+async function getAccessToken() {
+  if (tokenCache && Date.now() < tokenCache.expiresAt) return tokenCache.token;
+  const now = Math.floor(Date.now() / 1e3);
+  const header = Buffer.from(JSON.stringify({ alg: "RS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    iss: CLIENT_EMAIL,
+    scope: "https://www.googleapis.com/auth/drive",
+    aud: "https://oauth2.googleapis.com/token",
+    exp: now + 3600,
+    iat: now
+  })).toString("base64url");
+  const input = `${header}.${payload}`;
+  const sign = import_crypto.default.createSign("RSA-SHA256");
+  sign.update(input);
+  const sig = sign.sign(PRIVATE_KEY, "base64url");
+  const jwt = `${input}.${sig}`;
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+  });
+  const data = await res.json();
+  if (!data.access_token) throw new Error(`Google OAuth falhou: ${data.error_description ?? JSON.stringify(data)}`);
+  tokenCache = { token: data.access_token, expiresAt: Date.now() + 55 * 60 * 1e3 };
+  return data.access_token;
+}
+async function drivePost(path3, body) {
+  const token = await getAccessToken();
+  const res = await fetch(`https://www.googleapis.com/drive/v3/${path3}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+async function driveGet(path3, params = {}) {
+  const token = await getAccessToken();
+  const qs = new URLSearchParams(params).toString();
+  const res = await fetch(`https://www.googleapis.com/drive/v3/${path3}${qs ? `?${qs}` : ""}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return res.json();
+}
+async function createDriveFolder(name, parentId) {
+  const data = await drivePost("files", {
+    name,
+    mimeType: "application/vnd.google-apps.folder",
+    parents: [parentId]
+  });
+  if (!data.id) throw new Error(`Erro ao criar pasta "${name}" no Google Drive`);
+  return data.id;
+}
+async function createSellerFolders(emailPrefix) {
+  if (!DRIVE_ROOT_FOLDER_ID) throw new Error("GOOGLE_DRIVE_ROOT_FOLDER_ID n\xE3o definido");
+  const rootId = await createDriveFolder(emailPrefix, DRIVE_ROOT_FOLDER_ID);
+  const [inboxId, sentId] = await Promise.all([
+    createDriveFolder("Inbox", rootId),
+    createDriveFolder("Enviados", rootId)
+  ]);
+  return { rootId, inboxId, sentId };
+}
+async function listFilesInFolder(folderId) {
+  const q = `'${folderId}' in parents and mimeType='application/json' and trashed=false`;
+  const data = await driveGet("files", {
+    q,
+    fields: "files(id,name,createdTime)",
+    orderBy: "createdTime desc",
+    pageSize: "50"
+  });
+  return data.files ?? [];
+}
+async function readDriveFile(fileId) {
+  const token = await getAccessToken();
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`Erro ao ler ficheiro Drive ${fileId}: ${res.status}`);
+  return res.json();
+}
+async function saveFileToDrive(folderId, filename, content) {
+  const token = await getAccessToken();
+  const boundary = "ls_drive_boundary";
+  const metadata = JSON.stringify({ name: filename, parents: [folderId] });
+  const body = [
+    `--${boundary}`,
+    "Content-Type: application/json; charset=UTF-8",
+    "",
+    metadata,
+    `--${boundary}`,
+    "Content-Type: application/json",
+    "",
+    JSON.stringify(content),
+    `--${boundary}--`
+  ].join("\r\n");
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": `multipart/related; boundary=${boundary}`
+    },
+    body
+  });
+  const data = await res.json();
+  if (!data.id) throw new Error(`Erro ao guardar ficheiro no Drive: ${JSON.stringify(data)}`);
+  return data.id;
+}
+async function listSubfoldersInFolder(folderId) {
+  const q = `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const data = await driveGet("files", {
+    q,
+    fields: "files(id,name)",
+    orderBy: "name",
+    pageSize: "50"
+  });
+  return data.files ?? [];
+}
+function isDriveConfigured() {
+  return !!(CLIENT_EMAIL && PRIVATE_KEY && DRIVE_ROOT_FOLDER_ID);
+}
+
+// server.ts
 function loadLocalEnv() {
   for (const fileName of [".env.local", ".env"]) {
     const envPath = import_path.default.join(process.cwd(), fileName);
@@ -129803,6 +129931,22 @@ function buildApp() {
         }
       }
     });
+  };
+  const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+  const callGroq = async (messages, temperature = 0.7) => {
+    const apiKey = process.env.GROQ_API_KEY?.trim();
+    if (!apiKey) throw new Error("GROQ_API_KEY n\xE3o definida no .env.local");
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({ model: GROQ_MODEL, messages, temperature })
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(`Groq ${res.status}: ${json.error?.message || "Erro desconhecido"}`);
+    return json.choices?.[0]?.message?.content ?? "";
   };
   const getPrimaryUrl = (item) => {
     return item.extratags?.website || item.extratags?.contact_website || item.extratags?.["contact:website"] || void 0;
@@ -130245,7 +130389,7 @@ LeadScope AI - Oportunidade gerada a ${(/* @__PURE__ */ new Date()).toLocaleDate
     return leads;
   };
   const buildBasicLead = (leadData) => {
-    const id = import_crypto.default.randomUUID();
+    const id = import_crypto2.default.randomUUID();
     const phone = leadData.phone || leadData.allPhones?.[0];
     return {
       id,
@@ -130367,6 +130511,234 @@ LeadScope AI - Oportunidade gerada a ${(/* @__PURE__ */ new Date()).toLocaleDate
       if (error.code === "ESOCKET") log("Check host address and port.");
       log("STATUS: FAILED");
       res.status(500).json({ success: false, log: logEntries.join("\n") });
+    }
+  });
+  function escHtml(str) {
+    if (!str) return "";
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+  }
+  async function sendViaBrevo(payload) {
+    const apiKey = process.env.BREVO_API_KEY?.trim();
+    if (!apiKey) throw new Error("BREVO_API_KEY n\xE3o definida no .env.local");
+    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": apiKey
+      },
+      body: JSON.stringify(payload)
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(`Brevo ${res.status}: ${json.message ?? JSON.stringify(json)}`);
+    return json.messageId ?? "sem-id";
+  }
+  app2.post("/api/email/send", async (req, res) => {
+    const { to, toName, subject, body, leadId, sellerId, hotelName } = req.body || {};
+    if (!to || !subject || !body) {
+      return res.status(400).json({ error: "Campos obrigat\xF3rios: to, subject, body" });
+    }
+    const fromName = process.env.BREVO_FROM_NAME?.trim() || "LeadScope \xB7 Ecletika";
+    const fromEmail = process.env.BREVO_FROM_EMAIL?.trim();
+    if (!fromEmail) return res.status(500).json({ error: "BREVO_FROM_EMAIL n\xE3o configurado" });
+    const bodyHtml = escHtml(body).replace(/\n/g, "<br>");
+    const bccList = [];
+    let replyTo;
+    const adminForCopy = getSupabaseAdmin();
+    if (sellerId && adminForCopy) {
+      try {
+        const { data: sellerRow } = await adminForCopy.from("app_users").select("email, name").eq("id", sellerId).maybeSingle();
+        if (sellerRow?.email) {
+          bccList.push({ email: sellerRow.email, name: sellerRow.name || void 0 });
+          replyTo = { email: sellerRow.email, name: sellerRow.name || void 0 };
+        }
+      } catch {
+      }
+    }
+    const copyTo = process.env.EMAIL_COPY_TO?.trim() || fromEmail;
+    if (copyTo) bccList.push({ email: copyTo });
+    const seenBcc = /* @__PURE__ */ new Set([String(to).toLowerCase()]);
+    const bcc = bccList.filter((b) => b.email && !seenBcc.has(b.email.toLowerCase()) && (seenBcc.add(b.email.toLowerCase()), true));
+    try {
+      const messageId = await sendViaBrevo({
+        sender: { name: fromName, email: fromEmail },
+        to: [{ email: to, name: toName || to }],
+        ...bcc.length ? { bcc } : {},
+        ...replyTo ? { replyTo } : {},
+        subject,
+        htmlContent: `
+          <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#f8fbff;">
+            <div style="background:linear-gradient(135deg,#10b981,#047857);padding:28px 32px;">
+              <p style="color:rgba(255,255,255,0.75);font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:0.28em;margin:0 0 6px;">SOL \xB7 Plataforma de Opera\xE7\xF5es Hoteleiras</p>
+              <h1 style="color:#fff;font-size:18px;font-weight:800;margin:0;">${escHtml(hotelName || "")}</h1>
+            </div>
+            <div style="background:#fff;padding:32px;font-size:15px;color:#1a1a2e;line-height:1.7;">
+              ${bodyHtml}
+            </div>
+            <div style="padding:16px 32px;text-align:center;color:#a0aab8;font-size:11px;border-top:1px solid #f0f3f8;">
+              LeadScope \xB7 Ecletika \u2014 ecletikaportugal@gmail.com
+            </div>
+          </div>
+        `
+      });
+      if (leadId) {
+        const supabase = getSupabaseAdmin();
+        if (supabase) {
+          await supabase.from("crm_activities").insert({
+            lead_id: leadId,
+            seller_id: sellerId || null,
+            activity_type: "email",
+            outcome: "sent",
+            notes: `Email enviado via Brevo: "${subject}"`,
+            next_action_type: null,
+            next_action_at: null
+          });
+        }
+      }
+      if (isDriveConfigured() && sellerId) {
+        try {
+          const supabase = getSupabaseAdmin();
+          if (supabase) {
+            const { data: seller } = await supabase.from("app_users").select("name, drive_sent_id").eq("id", sellerId).maybeSingle();
+            let sentFolderId = seller?.drive_sent_id ?? null;
+            if (!sentFolderId) {
+              const rawName = seller?.name ?? sellerId;
+              const prefix = rawName.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, ".").replace(/[^a-z0-9.]/g, "").slice(0, 40) || "vendedor";
+              const folders = await createSellerFolders(prefix);
+              await supabase.from("app_users").update({
+                drive_folder_id: folders.rootId,
+                drive_inbox_id: folders.inboxId,
+                drive_sent_id: folders.sentId
+              }).eq("id", sellerId);
+              sentFolderId = folders.sentId;
+              console.log(`[Drive] \u2705 Pastas criadas automaticamente para ${sellerId}`);
+            }
+            if (sentFolderId) {
+              const ts = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+              const filename = `${ts}_${(to.split("@")[0] || "destinatario").slice(0, 30)}.json`;
+              await saveFileToDrive(sentFolderId, filename, {
+                type: "sent",
+                from: fromEmail,
+                to,
+                subject,
+                body,
+                sentAt: (/* @__PURE__ */ new Date()).toISOString(),
+                leadId: leadId || null,
+                hotelName: hotelName || null,
+                brevoMessageId: messageId,
+                read: true
+              });
+              console.log(`[Drive] \u2705 C\xF3pia guardada em Enviados (${sentFolderId})`);
+            }
+          }
+        } catch (driveErr) {
+          console.warn("[Drive] N\xE3o foi poss\xEDvel guardar c\xF3pia enviada:", driveErr.message);
+        }
+      }
+      console.log(`[Brevo] \u2705 Email enviado para ${to} | messageId: ${messageId}`);
+      res.json({ success: true, messageId });
+    } catch (err) {
+      console.error("[Brevo] Erro:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.post("/api/emails/setup-drive", async (req, res) => {
+    const { sellerId } = req.body;
+    if (!sellerId) return res.status(400).json({ error: "sellerId obrigat\xF3rio" });
+    if (!isDriveConfigured()) return res.json({ skipped: true, reason: "Drive n\xE3o configurado" });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.json({ skipped: true, reason: "Supabase n\xE3o configurado" });
+      const { data: user } = await supabase.from("app_users").select("name, drive_folder_id, drive_inbox_id, drive_sent_id").eq("id", sellerId).maybeSingle();
+      if (user?.drive_folder_id && user?.drive_inbox_id && user?.drive_sent_id) {
+        return res.json({ ok: true, alreadySetup: true });
+      }
+      const rawName = user?.name ?? sellerId;
+      const prefix = rawName.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, ".").replace(/[^a-z0-9.]/g, "").slice(0, 40) || "vendedor";
+      const folders = await createSellerFolders(prefix);
+      await supabase.from("app_users").update({
+        drive_folder_id: folders.rootId,
+        drive_inbox_id: folders.inboxId,
+        drive_sent_id: folders.sentId
+      }).eq("id", sellerId);
+      console.log(`[Drive] \u2705 Pastas criadas para ${rawName} (${sellerId}): ${JSON.stringify(folders)}`);
+      res.json({ ok: true, folders });
+    } catch (err) {
+      console.error("[Drive] setup-drive error:", err.message);
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.get("/api/emails/inbox", async (req, res) => {
+    const { sellerId } = req.query;
+    if (!sellerId) return res.status(400).json({ error: "sellerId obrigat\xF3rio" });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.json([]);
+      const { data: seller } = await supabase.from("app_users").select("drive_inbox_id").eq("id", sellerId).maybeSingle();
+      if (!seller?.drive_inbox_id) return res.json([]);
+      const files = await listFilesInFolder(seller.drive_inbox_id);
+      res.json(files);
+    } catch {
+      res.json([]);
+    }
+  });
+  app2.get("/api/emails/sent", async (req, res) => {
+    const { sellerId } = req.query;
+    if (!sellerId) return res.status(400).json({ error: "sellerId obrigat\xF3rio" });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.json([]);
+      const { data: seller } = await supabase.from("app_users").select("drive_sent_id").eq("id", sellerId).maybeSingle();
+      if (!seller?.drive_sent_id) return res.json([]);
+      const files = await listFilesInFolder(seller.drive_sent_id);
+      res.json(files);
+    } catch {
+      res.json([]);
+    }
+  });
+  app2.get("/api/emails/folders", async (req, res) => {
+    const { sellerId } = req.query;
+    if (!sellerId) return res.status(400).json({ error: "sellerId obrigat\xF3rio" });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.json([]);
+      const { data: user, error: dbErr } = await supabase.from("app_users").select("drive_folder_id").eq("id", sellerId).maybeSingle();
+      if (dbErr || !user?.drive_folder_id) return res.json([]);
+      const all = await listSubfoldersInFolder(user.drive_folder_id);
+      const custom = all.filter((f3) => f3.name !== "Inbox" && f3.name !== "Enviados");
+      res.json(custom);
+    } catch {
+      res.json([]);
+    }
+  });
+  app2.get("/api/emails/folder/:folderId", async (req, res) => {
+    try {
+      const files = await listFilesInFolder(req.params.folderId);
+      res.json(files);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.post("/api/emails/folder", async (req, res) => {
+    const { sellerId, name } = req.body;
+    if (!sellerId || !name) return res.status(400).json({ error: "sellerId e name obrigat\xF3rios" });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.status(500).json({ error: "Supabase n\xE3o configurado" });
+      const { data: user } = await supabase.from("app_users").select("drive_folder_id").eq("id", sellerId).maybeSingle();
+      if (!user?.drive_folder_id) return res.status(404).json({ error: "Pasta raiz do vendedor n\xE3o encontrada" });
+      const folderId = await createDriveFolder(name.trim(), user.drive_folder_id);
+      res.json({ id: folderId, name: name.trim() });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+  app2.get("/api/emails/:fileId", async (req, res) => {
+    try {
+      const email = await readDriveFile(req.params.fileId);
+      res.json(email);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
   });
   app2.get("/api/rnet/search", async (req, res) => {
@@ -130503,8 +130875,8 @@ LeadScope AI - Oportunidade gerada a ${(/* @__PURE__ */ new Date()).toLocaleDate
     });
   });
   app2.use("/api/gemini", (req, res, next) => {
-    const canRunWithoutGemini = req.path === "/searchLeads" || req.path === "/analyzeAndProposal" || req.path === "/generateProposal";
-    if (!process.env.GEMINI_API_KEY && !canRunWithoutGemini) {
+    const noGeminiNeeded = ["/searchLeads", "/analyzeAndProposal", "/generateProposal", "/simulate", "/askQuestion"];
+    if (!process.env.GEMINI_API_KEY && !noGeminiNeeded.includes(req.path)) {
       return res.status(503).json({
         error: "GEMINI_API_KEY n\xE3o est\xE1 configurada. Crie um arquivo .env.local com GEMINI_API_KEY=sua_chave ou defina a vari\xE1vel de ambiente antes de iniciar o servidor."
       });
@@ -130607,7 +130979,7 @@ LeadScope AI - Oportunidade gerada a ${(/* @__PURE__ */ new Date()).toLocaleDate
   });
   app2.post("/api/sellers/account", async (req, res) => {
     try {
-      const { name, email, password } = req.body || {};
+      const { name, email, password, emailPrefix } = req.body || {};
       if (!email || !password) {
         return res.status(400).json({ error: "Email e password sao obrigatorios." });
       }
@@ -130642,7 +131014,7 @@ LeadScope AI - Oportunidade gerada a ${(/* @__PURE__ */ new Date()).toLocaleDate
       if (!authUserId) {
         return res.status(500).json({ error: "Nao foi possivel obter o id do utilizador." });
       }
-      const { data: existingProfile } = await admin.from("app_users").select("id").eq("email", lowerEmail).maybeSingle();
+      const { data: existingProfile } = await admin.from("app_users").select("id, drive_inbox_id").eq("email", lowerEmail).maybeSingle();
       if (existingProfile?.id) {
         await admin.from("app_users").update({ name, status: "active" }).eq("id", existingProfile.id);
         return res.json({ userId: existingProfile.id });
@@ -130660,6 +131032,22 @@ LeadScope AI - Oportunidade gerada a ${(/* @__PURE__ */ new Date()).toLocaleDate
       if (insErr) {
         return res.status(500).json({ error: insErr.message });
       }
+      if (isDriveConfigured()) {
+        try {
+          const prefix = emailPrefix ? String(emailPrefix).toLowerCase().replace(/[^a-z0-9.]/g, "") : (name || lowerEmail.split("@")[0]).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, ".").replace(/[^a-z0-9.]/g, "");
+          const solEmail = `${prefix}@sol.ecletika.com`;
+          const folders = await createSellerFolders(prefix);
+          await admin.from("app_users").update({
+            email_address: solEmail,
+            drive_folder_id: folders.rootId,
+            drive_inbox_id: folders.inboxId,
+            drive_sent_id: folders.sentId
+          }).eq("id", authUserId);
+          console.log(`[Drive] \u2705 Pastas criadas para ${prefix}: inbox=${folders.inboxId}`);
+        } catch (driveErr) {
+          console.warn("[Drive] N\xE3o foi poss\xEDvel criar pastas:", driveErr.message);
+        }
+      }
       return res.json({ userId: authUserId });
     } catch (error) {
       console.error("Seller account error:", error);
@@ -130669,7 +131057,6 @@ LeadScope AI - Oportunidade gerada a ${(/* @__PURE__ */ new Date()).toLocaleDate
   app2.post("/api/gemini/simulate", async (req, res) => {
     try {
       const { persona, history, message, mode } = req.body || {};
-      const ai = getGeminiClient();
       const personaDesc = {
         reception_busy: "uma rececionista de hotel muito ocupada, com pouca paciencia, que tenta despachar a chamada rapidamente",
         housekeeper_resistant: "uma governanta experiente, resistente a tecnologia, que acha que o metodo atual ja funciona",
@@ -130699,12 +131086,8 @@ ${transcript}
 
 Responde como ${desc}:`;
       }
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: prompt,
-        config: { thinkingConfig: { thinkingBudget: 0 } }
-      });
-      res.json({ text: response.text || "" });
+      const text = await callGroq([{ role: "user", content: prompt }], 0.8);
+      res.json({ text });
     } catch (error) {
       console.error("Simulate error:", error);
       res.status(500).json({ error: error.message || "Erro na simulacao" });
@@ -130822,8 +131205,7 @@ Responde como ${desc}:`;
   app2.post("/api/gemini/askQuestion", async (req, res) => {
     try {
       const { lead, question, history } = req.body;
-      const ai = getGeminiClient();
-      const context = `
+      const systemPrompt = `
         LEAD CONTEXT:
         Hotel Name: ${lead.companyName}
         Website: ${lead.website || "None"}
@@ -130832,24 +131214,19 @@ Responde como ${desc}:`;
         Diagnosis: ${lead.diagnosis}
         Reviews: ${lead.mapsRating} stars (${lead.mapsReviews} reviews)
         Notas de Contacto: ${lead.contactNotes || "Nenhuma nota inserida"}
-      `;
-      const chatHistory = history.map((h2) => `${h2.role === "user" ? "User" : "AI"}: ${h2.content}`).join("\n");
-      const prompt = `
-        ${context}
-        
-        PREVIOUS CHAT:
-        ${chatHistory}
-        
-        USER QUESTION: "${question}"
-        
-        TASK: Responda de forma focada e assertiva sobre as oportunidades de vender o sistema de governa\xE7\xE3o / housekeeping para este hotel. Sugira t\xE1ticas de abordagem frias ou mensagens.
-        Language: Portuguese (Portugal).
-      `;
-      const response = await ai.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: prompt
-      });
-      res.json({ text: response.text || "Sem resposta." });
+
+        TASK: Responde de forma focada e assertiva sobre as oportunidades de vender o sistema de governacao / housekeeping SOL para este hotel. Sugere taticas de abordagem ou mensagens concretas. Responde sempre em Portugues de Portugal (PT-PT).
+      `.trim();
+      const messages = [
+        { role: "system", content: systemPrompt },
+        ...(Array.isArray(history) ? history : []).map((h2) => ({
+          role: h2.role === "user" ? "user" : "assistant",
+          content: h2.content
+        })),
+        { role: "user", content: question }
+      ];
+      const text = await callGroq(messages, 0.6);
+      res.json({ text: text || "Sem resposta." });
     } catch (error) {
       console.error("AskQuestion error:", error);
       res.status(500).json({ error: error.message || "Error asking question to AI" });
@@ -130913,7 +131290,7 @@ Responde como ${desc}:`;
       if (data.valid === false) {
         return res.json(null);
       }
-      const id = import_crypto.default.randomUUID();
+      const id = import_crypto2.default.randomUUID();
       const lead = {
         id,
         companyName: leadData.companyName || "Unknown",

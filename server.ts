@@ -803,6 +803,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   async function sendViaBrevo(payload: {
     sender: { name: string; email: string };
     to: { email: string; name?: string }[];
+    bcc?: { email: string; name?: string }[];
+    replyTo?: { email: string; name?: string };
     subject: string;
     htmlContent: string;
   }): Promise<string> {
@@ -837,10 +839,31 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
 
     const bodyHtml = escHtml(body).replace(/\n/g, "<br>");
 
+    // Copia para o vendedor (BCC) + endereco de copia configuravel; reply-to para o vendedor.
+    const bccList: { email: string; name?: string }[] = [];
+    let replyTo: { email: string; name?: string } | undefined;
+    const adminForCopy = getSupabaseAdmin();
+    if (sellerId && adminForCopy) {
+      try {
+        const { data: sellerRow } = await adminForCopy.from('app_users').select('email, name').eq('id', sellerId).maybeSingle();
+        if (sellerRow?.email) {
+          bccList.push({ email: sellerRow.email, name: sellerRow.name || undefined });
+          replyTo = { email: sellerRow.email, name: sellerRow.name || undefined };
+        }
+      } catch { /* ignora */ }
+    }
+    // Endereco de copia: EMAIL_COPY_TO se definido, senao o proprio remetente comercial.
+    const copyTo = process.env.EMAIL_COPY_TO?.trim() || fromEmail;
+    if (copyTo) bccList.push({ email: copyTo });
+    const seenBcc = new Set([String(to).toLowerCase()]);
+    const bcc = bccList.filter((b) => b.email && !seenBcc.has(b.email.toLowerCase()) && (seenBcc.add(b.email.toLowerCase()), true));
+
     try {
       const messageId = await sendViaBrevo({
         sender: { name: fromName, email: fromEmail },
         to: [{ email: to, name: toName || to }],
+        ...(bcc.length ? { bcc } : {}),
+        ...(replyTo ? { replyTo } : {}),
         subject,
         htmlContent: `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#f8fbff;">
