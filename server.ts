@@ -840,7 +840,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     try {
       const messageId = await sendViaBrevo({
         sender: { name: fromName, email: fromEmail },
-        to: [{ email: to, name: toName || "" }],
+        to: [{ email: to, name: toName || to }],
         subject,
         htmlContent: `
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto;background:#f8fbff;">
@@ -915,15 +915,13 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     if (!sellerId) return res.status(400).json({ error: 'sellerId obrigatório' });
     try {
       const supabase = getSupabaseAdmin();
-      if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
+      if (!supabase) return res.json([]);
       const { data: seller } = await supabase
         .from('app_users').select('drive_inbox_id').eq('id', sellerId).maybeSingle();
       if (!seller?.drive_inbox_id) return res.json([]);
       const files = await listFilesInFolder(seller.drive_inbox_id);
       res.json(files);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
+    } catch { res.json([]); }
   });
 
   app.get('/api/emails/sent', async (req, res) => {
@@ -931,15 +929,13 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     if (!sellerId) return res.status(400).json({ error: 'sellerId obrigatório' });
     try {
       const supabase = getSupabaseAdmin();
-      if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
+      if (!supabase) return res.json([]);
       const { data: seller } = await supabase
         .from('app_users').select('drive_sent_id').eq('id', sellerId).maybeSingle();
       if (!seller?.drive_sent_id) return res.json([]);
       const files = await listFilesInFolder(seller.drive_sent_id);
       res.json(files);
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
+    } catch { res.json([]); }
   });
 
   app.get('/api/emails/:fileId', async (req, res) => {
@@ -967,14 +963,19 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     if (!sellerId) return res.status(400).json({ error: 'sellerId obrigatório' });
     try {
       const supabase = getSupabaseAdmin();
-      if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
-      const { data: user } = await supabase.from('app_users').select('drive_folder_id').eq('id', sellerId).single();
-      if (!user?.drive_folder_id) return res.json([]);
+      if (!supabase) return res.json([]);
+      const { data: user, error: dbErr } = await supabase
+        .from('app_users')
+        .select('drive_folder_id')
+        .eq('id', sellerId)
+        .maybeSingle();
+      // Column may not exist yet (pending migration) — return empty list gracefully
+      if (dbErr || !user?.drive_folder_id) return res.json([]);
       const all = await listSubfoldersInFolder(user.drive_folder_id);
       const custom = all.filter((f) => f.name !== 'Inbox' && f.name !== 'Enviados');
       res.json(custom);
     } catch (err: any) {
-      res.status(500).json({ error: err.message });
+      res.json([]); // never crash the UI — folders are optional
     }
   });
 
