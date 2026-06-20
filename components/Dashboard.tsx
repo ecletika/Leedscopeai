@@ -1544,7 +1544,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             <MessageTemplates
                 lead={activeLeadForMessages}
                 onClose={() => setActiveLeadForMessages(null)}
-                sellerId={currentSeller?.id}
+                sellerId={currentSeller?.id ?? currentUser.id}
             />
         )}
 
