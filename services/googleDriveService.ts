@@ -134,6 +134,19 @@ export async function saveFileToDrive(
   return data.id;
 }
 
+export type DriveFolder = { id: string; name: string };
+
+export async function listSubfoldersInFolder(folderId: string): Promise<DriveFolder[]> {
+  const q = `'${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  const data = await driveGet('files', {
+    q,
+    fields: 'files(id,name)',
+    orderBy: 'name',
+    pageSize: '50',
+  }) as { files?: DriveFolder[] };
+  return data.files ?? [];
+}
+
 export function isDriveConfigured(): boolean {
   return !!(CLIENT_EMAIL && PRIVATE_KEY && DRIVE_ROOT_FOLDER_ID);
 }

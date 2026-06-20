@@ -13,6 +13,8 @@ import {
   readDriveFile,
   saveFileToDrive,
   isDriveConfigured,
+  listSubfoldersInFolder,
+  createDriveFolder,
 } from "./services/googleDriveService.js";
 
 function loadLocalEnv() {
@@ -944,6 +946,49 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     try {
       const email = await readDriveFile(req.params.fileId);
       res.json(email);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // list files in a custom Drive folder
+  app.get('/api/emails/folder/:folderId', async (req, res) => {
+    try {
+      const files = await listFilesInFolder(req.params.folderId);
+      res.json(files);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // list custom subfolders for a seller (excludes Inbox / Enviados)
+  app.get('/api/emails/folders', async (req, res) => {
+    const { sellerId } = req.query as { sellerId?: string };
+    if (!sellerId) return res.status(400).json({ error: 'sellerId obrigatório' });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
+      const { data: user } = await supabase.from('app_users').select('drive_folder_id').eq('id', sellerId).single();
+      if (!user?.drive_folder_id) return res.json([]);
+      const all = await listSubfoldersInFolder(user.drive_folder_id);
+      const custom = all.filter((f) => f.name !== 'Inbox' && f.name !== 'Enviados');
+      res.json(custom);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // create a custom folder for a seller
+  app.post('/api/emails/folder', async (req, res) => {
+    const { sellerId, name } = req.body as { sellerId?: string; name?: string };
+    if (!sellerId || !name) return res.status(400).json({ error: 'sellerId e name obrigatórios' });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
+      const { data: user } = await supabase.from('app_users').select('drive_folder_id').eq('id', sellerId).single();
+      if (!user?.drive_folder_id) return res.status(404).json({ error: 'Pasta raiz do vendedor não encontrada' });
+      const folderId = await createDriveFolder(name.trim(), user.drive_folder_id);
+      res.json({ id: folderId, name: name.trim() });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

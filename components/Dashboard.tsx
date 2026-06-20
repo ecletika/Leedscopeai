@@ -76,7 +76,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   const [activeLeadForPlay, setActiveLeadForPlay] = useState<Lead | null>(null);
   const [activeLeadForDemo, setActiveLeadForDemo] = useState<Lead | null>(null);
   const [activeLeadForMessages, setActiveLeadForMessages] = useState<Lead | null>(null);
-  const [showEmailInbox, setShowEmailInbox] = useState(false);
+  // email tab — managed via activeTab === 'email'
   const [activeLeadForQualify, setActiveLeadForQualify] = useState<Lead | null>(null);
   const [activeLeadForProposalBuilder, setActiveLeadForProposalBuilder] = useState<Lead | null>(null);
   const [crmSellers, setCrmSellers] = useState<CrmSeller[]>([]);
@@ -675,8 +675,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             </button>
 
             <button
-                onClick={() => setShowEmailInbox(true)}
-                className="w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent"
+                onClick={() => setActiveTab('email')}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'email' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
             >
                 <Mail className="w-4 h-4" /> Caixa de Email
             </button>
@@ -742,6 +742,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 {activeTab === 'followup' && 'Follow-up e Reagendamentos'}
                 {activeTab === 'tools' && 'Ferramentas de Venda'}
                 {activeTab === 'academy' && 'Academia SOL'}
+                {activeTab === 'email' && 'Caixa de Email'}
                 {activeTab === 'agenda' && 'Agenda para Voltar Contactos (Callbacks)'}
                 {activeTab === 'crm' && 'Dashboard de Vendas'}
                 {activeTab === 'sellers' && 'Equipa Comercial'}
@@ -762,8 +763,15 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6">
-            
+        {/* --- CAIXA DE EMAIL — full height, no padding, no scroll --- */}
+        {activeTab === 'email' && (
+            <div className="flex-1 overflow-hidden">
+                <EmailInbox sellerId={currentSeller?.id ?? currentUser.id} />
+            </div>
+        )}
+
+        <div className={`flex-1 overflow-y-auto p-6 ${activeTab === 'email' ? 'hidden' : ''}`}>
+
             {/* --- DASHBOARD (NEW CAMPAIGN) --- */}
             {activeTab === 'dashboard' && (
                 <div className="space-y-6">
@@ -1540,13 +1548,6 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             />
         )}
 
-        {/* --- CAIXA DE EMAIL (Drive) --- */}
-        {showEmailInbox && (
-            <EmailInbox
-                sellerId={currentSeller?.id ?? currentUser.id}
-                onClose={() => setShowEmailInbox(false)}
-            />
-        )}
 
         {/* --- QUALIFICACAO DO LEAD (M34) --- */}
         {activeLeadForQualify && (
