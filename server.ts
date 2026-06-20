@@ -7,6 +7,13 @@ import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
+import {
+  createSellerFolders,
+  listFilesInFolder,
+  readDriveFile,
+  saveFileToDrive,
+  isDriveConfigured,
+} from "./services/googleDriveService.js";
 
 function loadLocalEnv() {
   for (const fileName of [".env.local", ".env"]) {
@@ -865,6 +872,32 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         }
       }
 
+      // Guardar cópia no Google Drive (pasta Enviados do vendedor)
+      if (isDriveConfigured() && sellerId) {
+        try {
+          const supabase = getSupabaseAdmin();
+          if (supabase) {
+            const { data: seller } = await supabase
+              .from('app_users')
+              .select('drive_sent_id')
+              .eq('id', sellerId)
+              .maybeSingle();
+            if (seller?.drive_sent_id) {
+              const ts = new Date().toISOString().replace(/[:.]/g, '-');
+              const filename = `${ts}_${(to.split('@')[0] || 'destinatario').slice(0, 30)}.json`;
+              await saveFileToDrive(seller.drive_sent_id, filename, {
+                type: 'sent', from: fromEmail, to, subject,
+                body, sentAt: new Date().toISOString(),
+                leadId: leadId || null, hotelName: hotelName || null,
+                brevoMessageId: messageId, read: true,
+              });
+            }
+          }
+        } catch (driveErr: any) {
+          console.warn('[Drive] Não foi possível guardar cópia enviada:', driveErr.message);
+        }
+      }
+
       console.log(`[Brevo] ✅ Email enviado para ${to} | messageId: ${messageId}`);
       res.json({ success: true, messageId });
     } catch (err: any) {
@@ -872,6 +905,50 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       res.status(500).json({ error: err.message });
     }
   });
+
+  // ── Email Drive endpoints ──────────────────────────────────────────────────
+
+  app.get('/api/emails/inbox', async (req, res) => {
+    const { sellerId } = req.query as { sellerId?: string };
+    if (!sellerId) return res.status(400).json({ error: 'sellerId obrigatório' });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
+      const { data: seller } = await supabase
+        .from('app_users').select('drive_inbox_id').eq('id', sellerId).maybeSingle();
+      if (!seller?.drive_inbox_id) return res.json([]);
+      const files = await listFilesInFolder(seller.drive_inbox_id);
+      res.json(files);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/emails/sent', async (req, res) => {
+    const { sellerId } = req.query as { sellerId?: string };
+    if (!sellerId) return res.status(400).json({ error: 'sellerId obrigatório' });
+    try {
+      const supabase = getSupabaseAdmin();
+      if (!supabase) return res.status(500).json({ error: 'Supabase não configurado' });
+      const { data: seller } = await supabase
+        .from('app_users').select('drive_sent_id').eq('id', sellerId).maybeSingle();
+      if (!seller?.drive_sent_id) return res.json([]);
+      const files = await listFilesInFolder(seller.drive_sent_id);
+      res.json(files);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/emails/:fileId', async (req, res) => {
+    try {
+      const email = await readDriveFile(req.params.fileId);
+      res.json(email);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // ─────────────────────────────────────────────────────────────────────────
 
   app.get('/api/rnet/search', async (req, res) => {
@@ -1171,7 +1248,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   // Route: criar/atualizar conta de login de um vendedor via Supabase Auth (service role)
   app.post('/api/sellers/account', async (req, res) => {
     try {
-      const { name, email, password } = req.body || {};
+      const { name, email, password, emailPrefix } = req.body || {};
       if (!email || !password) {
         return res.status(400).json({ error: 'Email e password sao obrigatorios.' });
       }
@@ -1214,7 +1291,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       }
 
       // 2) Garante o perfil em app_users com papel 'user' (evita a promocao automatica a admin no login)
-      const { data: existingProfile } = await admin.from('app_users').select('id').eq('email', lowerEmail).maybeSingle();
+      const { data: existingProfile } = await admin.from('app_users').select('id, drive_inbox_id').eq('email', lowerEmail).maybeSingle();
       if (existingProfile?.id) {
         await admin.from('app_users').update({ name, status: 'active' }).eq('id', existingProfile.id);
         return res.json({ userId: existingProfile.id });
@@ -1226,6 +1303,29 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       if (insErr) {
         return res.status(500).json({ error: insErr.message });
       }
+
+      // 3) Criar pastas no Google Drive automaticamente
+      if (isDriveConfigured()) {
+        try {
+          const prefix = emailPrefix
+            ? String(emailPrefix).toLowerCase().replace(/[^a-z0-9.]/g, '')
+            : (name || lowerEmail.split('@')[0]).toLowerCase()
+                .normalize('NFD').replace(/[̀-ͯ]/g, '')
+                .replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '');
+          const solEmail = `${prefix}@sol.ecletika.com`;
+          const folders = await createSellerFolders(prefix);
+          await admin.from('app_users').update({
+            email_address: solEmail,
+            drive_folder_id: folders.rootId,
+            drive_inbox_id: folders.inboxId,
+            drive_sent_id: folders.sentId,
+          }).eq('id', authUserId);
+          console.log(`[Drive] ✅ Pastas criadas para ${prefix}: inbox=${folders.inboxId}`);
+        } catch (driveErr: any) {
+          console.warn('[Drive] Não foi possível criar pastas:', driveErr.message);
+        }
+      }
+
       return res.json({ userId: authUserId });
     } catch (error: any) {
       console.error('Seller account error:', error);
