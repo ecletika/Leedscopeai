@@ -400,10 +400,12 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     found: boolean; name?: string; phone?: string; website?: string;
     address?: string; rating?: number; totalRatings?: number;
   } | null>(null);
+  const [enrichSaved, setEnrichSaved] = useState<string[]>([]);
 
   const handleEnrich = async () => {
     setEnriching(true);
     setEnrichResult(null);
+    setEnrichSaved([]);
     try {
       const res = await fetch('/api/places/enrich', {
         method: 'POST',
@@ -417,6 +419,15 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     } finally {
       setEnriching(false);
     }
+  };
+
+  const handleApplyEnrich = async (field: 'phone' | 'website', value: string) => {
+    // Guarda imediatamente na ficha do hotel
+    const updated = { ...lead, [field]: value, lastActivityAt: new Date().toISOString() };
+    await hotelDb.saveHotel(updated);
+    // Também preenche o campo local do resultado da chamada
+    if (field === 'phone') setDecisionPhone(value);
+    setEnrichSaved((prev) => [...prev, field]);
   };
 
   // Novo contacto
@@ -672,12 +683,18 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                   <span className="flex items-center gap-1 text-gray-700">
                     <Phone className="h-3 w-3 text-emerald-500" />
                     <span className="font-mono font-bold text-emerald-700">{enrichResult.phone}</span>
-                    <button
-                      onClick={() => { setDecisionPhone(enrichResult.phone!); setEnrichResult(null); }}
-                      className="ml-1 rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100"
-                    >
-                      Usar
-                    </button>
+                    {enrichSaved.includes('phone') ? (
+                      <span className="ml-1 flex items-center gap-0.5 rounded border border-emerald-300 bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                        <CheckCircle className="h-2.5 w-2.5" /> Guardado
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleApplyEnrich('phone', enrichResult.phone!)}
+                        className="ml-1 rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100"
+                      >
+                        Guardar na ficha
+                      </button>
+                    )}
                   </span>
                 )}
                 {enrichResult.website && (
@@ -686,6 +703,18 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                     <a href={enrichResult.website} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
                       {enrichResult.website.replace(/^https?:\/\//, '').split('/')[0]}
                     </a>
+                    {enrichSaved.includes('website') ? (
+                      <span className="ml-1 flex items-center gap-0.5 rounded border border-indigo-300 bg-indigo-100 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                        <CheckCircle className="h-2.5 w-2.5" /> Guardado
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleApplyEnrich('website', enrichResult.website!)}
+                        className="ml-1 rounded border border-indigo-300 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 hover:bg-indigo-100"
+                      >
+                        Guardar na ficha
+                      </button>
+                    )}
                   </span>
                 )}
                 {enrichResult.address && (
