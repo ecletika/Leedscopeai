@@ -216,7 +216,7 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
     // Slide 0 — capa
     if (clampedIndex === 0) {
       return (
-        <div className="flex h-full flex-col items-center justify-center text-center">
+        <div className="flex h-full flex-col items-center justify-center p-8 text-center">
           <div className="mb-4 flex items-center gap-3">
             <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-6xl font-black text-transparent">SOL</span>
           </div>
@@ -227,33 +227,35 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
       );
     }
 
-    // Slides de valor
+    // Slides de valor — texto esquerda, imagem direita a meia tela
     if (clampedIndex >= 1 && clampedIndex <= valueSlides.length) {
       const slide = valueSlides[clampedIndex - 1];
       const img = MODULE_IMAGES[slide.module];
       return (
-        <div className="grid h-full grid-cols-1 gap-8 lg:grid-cols-2">
-          <div className="flex flex-col justify-center">
+        <div className="grid h-full grid-cols-2">
+          {/* Metade esquerda — texto */}
+          <div className="flex flex-col justify-center px-12 py-10">
             <span className="mb-3 inline-flex w-fit items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-bold text-rose-600">Problema</span>
             <h2 className="text-2xl font-bold text-gray-900">{slide.problem}</h2>
             <div className="mt-6">
               <span className="mb-2 inline-flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">Como o SOL resolve</span>
-              <p className="text-base leading-relaxed text-gray-700">{slide.solution}</p>
+              <p className="mt-2 text-base leading-relaxed text-gray-700">{slide.solution}</p>
             </div>
             <div className="mt-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <Sparkles className="h-4 w-4 text-emerald-600" />
+              <Sparkles className="h-4 w-4 shrink-0 text-emerald-600" />
               <span className="text-sm font-semibold text-emerald-700">{slide.benefit}</span>
             </div>
           </div>
-          <div className="flex items-center justify-center">
+          {/* Metade direita — imagem ocupa tudo de cima a baixo */}
+          <div className="h-full overflow-hidden">
             {img ? (
               <img
                 src={img}
                 alt={slide.problem}
-                className="max-h-[62vh] w-full rounded-2xl border border-gray-200 object-contain shadow-lg"
+                className="h-full w-full object-cover object-top"
               />
             ) : (
-              <div className="flex h-64 w-full items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 text-sm text-gray-400">
+              <div className="flex h-full items-center justify-center border-l border-gray-200 text-sm text-gray-400">
                 Imagem do modulo M{slide.module}
               </div>
             )}
@@ -265,7 +267,7 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
     // Slide comparador
     if (clampedIndex === valueSlides.length + 1) {
       return (
-        <div className="flex h-full flex-col justify-center">
+        <div className="flex h-full flex-col justify-center p-8">
           <h2 className="mb-1 text-2xl font-bold text-gray-900">SOL vs WhatsApp / Papel / Excel</h2>
           <p className="mb-5 text-sm text-gray-500">Muitos hoteis comecam no WhatsApp. Eis a diferenca na pratica.</p>
           <div className="overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
@@ -294,7 +296,7 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
 
     // Slide proximos passos
     return (
-      <div className="flex h-full flex-col items-center justify-center text-center">
+      <div className="flex h-full flex-col items-center justify-center p-8 text-center">
         <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
           <Check className="h-8 w-8 text-emerald-600" />
         </div>
@@ -342,8 +344,8 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
       </div>
 
       {/* slide */}
-      <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
-        <div className="mx-auto h-full max-w-6xl">{renderSlide()}</div>
+      <main className="flex-1 overflow-hidden bg-gray-50">
+        <div className="h-full">{renderSlide()}</div>
       </main>
 
       {/* rodape navegacao */}
