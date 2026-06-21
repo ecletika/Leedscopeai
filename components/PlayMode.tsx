@@ -401,6 +401,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     address?: string; rating?: number; totalRatings?: number;
   } | null>(null);
   const [enrichSaved, setEnrichSaved] = useState<string[]>([]);
+  // Dados "ao vivo" que substituem o lead original depois de enriquecer
+  const [livePhone, setLivePhone] = useState(lead.phone || '');
+  const [liveWebsite, setLiveWebsite] = useState(lead.website || '');
 
   const handleEnrich = async () => {
     setEnriching(true);
@@ -422,11 +425,10 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   };
 
   const handleApplyEnrich = async (field: 'phone' | 'website', value: string) => {
-    // Guarda imediatamente na ficha do hotel
     const updated = { ...lead, [field]: value, lastActivityAt: new Date().toISOString() };
     await hotelDb.saveHotel(updated);
-    // Também preenche o campo local do resultado da chamada
-    if (field === 'phone') setDecisionPhone(value);
+    if (field === 'phone') { setDecisionPhone(value); setLivePhone(value); }
+    if (field === 'website') setLiveWebsite(value);
     setEnrichSaved((prev) => [...prev, field]);
   };
 
@@ -631,11 +633,11 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{lead.location}</span>
-                {lead.phone && (
+                {livePhone && (
                 <span className="flex items-center gap-2">
-                  <a href={`tel:${lead.phone}`} className="flex items-center gap-1 font-mono text-emerald-600 hover:underline"><Phone className="h-3 w-3" />{lead.phone}</a>
+                  <a href={`tel:${livePhone}`} className="flex items-center gap-1 font-mono text-emerald-600 hover:underline"><Phone className="h-3 w-3" />{livePhone}</a>
                   <TwilioCall
-                    phoneNumber={lead.phone}
+                    phoneNumber={livePhone}
                     leadName={lead.companyName}
                     onCallEnded={(secs) => {
                       const mins = Math.floor(secs / 60);
@@ -647,7 +649,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                 </span>
               )}
                 {lead.email && <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-gray-600 hover:underline"><Mail className="h-3 w-3" />{lead.email}</a>}
-                {lead.website && <a href={lead.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-600 hover:underline"><Globe className="h-3 w-3" />Website</a>}
+                {liveWebsite && <a href={liveWebsite} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-600 hover:underline"><Globe className="h-3 w-3" />{liveWebsite.replace(/^https?:\/\//, '').split('/')[0]}</a>}
                 <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" />{sellerName}</span>
                 <button onClick={() => setShowHistory(true)} className="flex items-center gap-1 hover:text-emerald-600">
                   <ClipboardList className="h-3 w-3" />{activities.length} contacto(s) anteriores
