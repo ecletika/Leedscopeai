@@ -1999,5 +1999,55 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     res.status(204).send();
   });
 
+  // ── GOOGLE PLACES — Enriquecimento de dados de hoteis ───────────────────────
+  app.post('/api/places/enrich', async (req, res) => {
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    if (!apiKey) return res.status(503).json({ error: 'GOOGLE_PLACES_API_KEY nao configurada no servidor.' });
+
+    const { name, location } = req.body as { name?: string; location?: string };
+    if (!name) return res.status(400).json({ error: 'Nome do hotel e obrigatorio.' });
+
+    const query = [name, location, 'hotel'].filter(Boolean).join(' ');
+
+    try {
+      const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': [
+            'places.displayName',
+            'places.formattedAddress',
+            'places.nationalPhoneNumber',
+            'places.internationalPhoneNumber',
+            'places.websiteUri',
+            'places.rating',
+            'places.userRatingCount'
+          ].join(',')
+        },
+        body: JSON.stringify({ textQuery: query, languageCode: 'pt' })
+      });
+
+      const data: any = await response.json();
+      if (!data.places || data.places.length === 0) {
+        return res.json({ found: false });
+      }
+
+      const place = data.places[0];
+      res.json({
+        found: true,
+        name: place.displayName?.text ?? null,
+        phone: place.internationalPhoneNumber ?? place.nationalPhoneNumber ?? null,
+        website: place.websiteUri ?? null,
+        address: place.formattedAddress ?? null,
+        rating: place.rating ?? null,
+        totalRatings: place.userRatingCount ?? null
+      });
+    } catch (err: any) {
+      console.error('[Places] enrich error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   return app;
 }

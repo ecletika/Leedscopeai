@@ -17,7 +17,8 @@ import {
   Sparkles,
   Star,
   User as UserIcon,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import {
   CommercialLeadStatus,
@@ -393,6 +394,31 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [demoCenterTab, setDemoCenterTab] = useState<'pitch' | 'demo'>('pitch');
   const [activeDemoStep, setActiveDemoStep] = useState<string | null>(null);
 
+  // Enriquecimento de dados via Google Places
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<{
+    found: boolean; name?: string; phone?: string; website?: string;
+    address?: string; rating?: number; totalRatings?: number;
+  } | null>(null);
+
+  const handleEnrich = async () => {
+    setEnriching(true);
+    setEnrichResult(null);
+    try {
+      const res = await fetch('/api/places/enrich', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: lead.companyName, location: lead.location })
+      });
+      const data = await res.json();
+      setEnrichResult(data);
+    } catch {
+      setEnrichResult({ found: false });
+    } finally {
+      setEnriching(false);
+    }
+  };
+
   // Novo contacto
   const [newContactType, setNewContactType] = useState<CrmContactType>('manager');
   const [newContactName, setNewContactName] = useState('');
@@ -618,10 +644,68 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               </div>
             </div>
           </div>
-          <button onClick={onClose} className="flex shrink-0 items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
-            <X className="h-4 w-4" /> Sair
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={handleEnrich}
+              disabled={enriching}
+              className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 disabled:opacity-50"
+              title="Pesquisar dados no Google Maps"
+            >
+              {enriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+              Enriquecer dados
+            </button>
+            <button onClick={onClose} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
+              <X className="h-4 w-4" /> Sair
+            </button>
+          </div>
         </div>
+
+        {/* Painel de resultado do enriquecimento */}
+        {enrichResult && (
+          <div className={`mt-2 rounded-xl border p-3 text-[11px] ${enrichResult.found ? 'border-indigo-200 bg-indigo-50' : 'border-gray-200 bg-gray-50'}`}>
+            {!enrichResult.found ? (
+              <span className="text-gray-500">Nenhum resultado encontrado no Google Maps para este hotel.</span>
+            ) : (
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-1">
+                <span className="font-bold text-indigo-700">Google Maps encontrou:</span>
+                {enrichResult.phone && (
+                  <span className="flex items-center gap-1 text-gray-700">
+                    <Phone className="h-3 w-3 text-emerald-500" />
+                    <span className="font-mono font-bold text-emerald-700">{enrichResult.phone}</span>
+                    <button
+                      onClick={() => { setDecisionPhone(enrichResult.phone!); setEnrichResult(null); }}
+                      className="ml-1 rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100"
+                    >
+                      Usar
+                    </button>
+                  </span>
+                )}
+                {enrichResult.website && (
+                  <span className="flex items-center gap-1 text-gray-700">
+                    <Globe className="h-3 w-3 text-indigo-500" />
+                    <a href={enrichResult.website} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                      {enrichResult.website.replace(/^https?:\/\//, '').split('/')[0]}
+                    </a>
+                  </span>
+                )}
+                {enrichResult.address && (
+                  <span className="flex items-center gap-1 text-gray-600">
+                    <MapPin className="h-3 w-3 text-gray-400" />{enrichResult.address}
+                  </span>
+                )}
+                {enrichResult.rating && (
+                  <span className="flex items-center gap-1 text-amber-700">
+                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                    {enrichResult.rating} ({enrichResult.totalRatings} avaliações)
+                  </span>
+                )}
+                <button onClick={() => setEnrichResult(null)} className="ml-auto text-gray-400 hover:text-gray-600">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Strip de contactos compacto */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
