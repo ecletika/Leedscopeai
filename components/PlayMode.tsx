@@ -2,18 +2,23 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import TwilioCall from './TwilioCall';
 import {
   AlertTriangle,
+  BadgePercent,
   Bot,
   CalendarClock,
   CheckCircle,
+  ClipboardCheck,
   ClipboardList,
+  FileText,
   Globe,
   Loader2,
   Mail,
   MapPin,
   MessageSquare,
+  MessagesSquare,
   Monitor,
   Phone,
   Plus,
+  Presentation,
   ShieldOff,
   Sparkles,
   Star,
@@ -45,6 +50,12 @@ interface PlayModeProps {
   closeReasons: CrmCloseReason[];
   onClose: () => void;
   onSaved: () => void;
+  onOpenDemo?: () => void;
+  onOpenMessages?: () => void;
+  onOpenQualify?: () => void;
+  onOpenProposalBuilder?: () => void;
+  onSelectProposal?: () => void;
+  onSelectChat?: () => void;
 }
 
 const contactTypeOptions: { value: CrmContactType; label: string }[] = [
@@ -371,7 +382,7 @@ const plusDays = (days: number) => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
 
-export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved }: PlayModeProps) {
+export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved, onOpenDemo, onOpenMessages, onOpenQualify, onOpenProposalBuilder, onSelectProposal, onSelectChat }: PlayModeProps) {
   const seller = useMemo(
     () => sellers.find((s) => s.id === lead.responsibleSellerId),
     [sellers, lead.responsibleSellerId]
@@ -672,7 +683,39 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               </div>
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
+            {/* Ferramentas — movidas para dentro do Play */}
+            {onOpenDemo && (
+              <button onClick={onOpenDemo} title="Demo comercial" className="flex items-center gap-1 rounded-lg border border-cyan-300 bg-cyan-50 px-2.5 py-2 text-[11px] font-bold text-cyan-700 shadow-sm transition hover:bg-cyan-100">
+                <Presentation className="h-3.5 w-3.5" /> Demo
+              </button>
+            )}
+            {onOpenMessages && (
+              <button onClick={onOpenMessages} title="Templates email/WhatsApp" className="rounded-lg border border-sky-300 bg-sky-50 p-2 text-sky-700 shadow-sm transition hover:bg-sky-100">
+                <MessagesSquare className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onOpenQualify && (
+              <button onClick={onOpenQualify} title="Qualificar lead" className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-amber-700 shadow-sm transition hover:bg-amber-100">
+                <ClipboardCheck className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onOpenProposalBuilder && (
+              <button onClick={onOpenProposalBuilder} title="Proposta comercial" className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-emerald-700 shadow-sm transition hover:bg-emerald-100">
+                <BadgePercent className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onSelectProposal && (
+              <button onClick={onSelectProposal} title="Ver proposta" className="rounded-lg border border-blue-300 bg-blue-50 p-2 text-blue-700 shadow-sm transition hover:bg-blue-100">
+                <FileText className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {onSelectChat && (
+              <button onClick={onSelectChat} title="IA — perguntar sobre o lead" className="rounded-lg border border-purple-300 bg-purple-50 p-2 text-purple-700 shadow-sm transition hover:bg-purple-100">
+                <Bot className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <div className="mx-1 h-5 w-px bg-gray-200" />
             <button
               onClick={handleEnrich}
               disabled={enriching}
@@ -680,7 +723,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               title="Pesquisar dados no Google Maps"
             >
               {enriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-              Enriquecer dados
+              Enriquecer
             </button>
             <button onClick={onClose} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
               <X className="h-4 w-4" /> Sair

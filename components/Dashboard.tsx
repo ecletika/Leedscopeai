@@ -1527,6 +1527,11 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 closeReasons={crmCloseReasons}
                 onClose={() => setActiveLeadForPlay(null)}
                 onSaved={handlePlaySaved}
+                onOpenDemo={() => setActiveLeadForDemo(activeLeadForPlay)}
+                onOpenMessages={() => setActiveLeadForMessages(activeLeadForPlay)}
+                onOpenQualify={() => setActiveLeadForQualify(activeLeadForPlay)}
+                onOpenProposalBuilder={() => setActiveLeadForProposalBuilder(activeLeadForPlay)}
+                onSelectChat={() => setActiveLeadForChat(activeLeadForPlay)}
             />
         )}
 

@@ -603,25 +603,9 @@ export default function HotelManagement({ onSelectProposal, onSelectChat, onOpen
                   <Play className="h-3.5 w-3.5" />
                   Play
                 </button>
-                {onOpenDemo && (
-                  <button onClick={() => onOpenDemo(hotel)} className="flex items-center justify-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-bold text-cyan-300 transition hover:bg-cyan-500/20" title="Abrir Demo Comercial">
-                  <Presentation className="h-3.5 w-3.5" />
-                  Demo
+                <button onClick={() => handleDelete(hotel.id, hotel.companyName)} className="rounded-lg border border-gray-700 bg-gray-800 p-2 text-rose-300 transition hover:bg-rose-600 hover:text-white" title="Excluir">
+                  <Trash2 className="h-4 w-4" />
                 </button>
-                )}
-                <button onClick={() => handleOpenEditModal(hotel)} className="rounded-lg border border-gray-700 bg-gray-800 p-2 text-emerald-300 transition hover:bg-gray-700" title="Editar lead">
-                  <Edit className="h-4 w-4" />
-                </button>
-                {onSelectProposal && (
-                  <button onClick={() => onSelectProposal(hotel)} className="rounded-lg border border-gray-700 bg-gray-800 p-2 text-blue-300 transition hover:bg-gray-700" title="Proposta">
-                    <FileText className="h-4 w-4" />
-                  </button>
-                )}
-                {onSelectChat && (
-                  <button onClick={() => onSelectChat(hotel)} className="rounded-lg border border-gray-700 bg-gray-800 p-2 text-purple-300 transition hover:bg-gray-700" title="IA">
-                    <Bot className="h-4 w-4" />
-                  </button>
-                )}
               </footer>
             </div>
           ))}
@@ -698,42 +682,6 @@ export default function HotelManagement({ onSelectProposal, onSelectChat, onOpen
                         <button onClick={() => handleStartPlay(hotel)} className="rounded-lg bg-emerald-600 p-1.5 text-white transition hover:bg-emerald-500" title="Modo Play">
                           <Play className="h-3.5 w-3.5" />
                         </button>
-                        {onOpenDemo && (
-                          <button onClick={() => onOpenDemo(hotel)} className="rounded-lg bg-gray-800 p-1.5 text-cyan-300 transition hover:bg-gray-700" title="Abrir Demo Comercial">
-                            <Presentation className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {onOpenMessages && (
-                          <button onClick={() => onOpenMessages(hotel)} className="rounded-lg bg-gray-800 p-1.5 text-sky-300 transition hover:bg-gray-700" title="Templates de email/WhatsApp">
-                            <MessagesSquare className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {onOpenQualify && (
-                          <button onClick={() => onOpenQualify(hotel)} className={`rounded-lg p-1.5 transition hover:bg-gray-700 ${hotel.qualification?.qualifiedAt ? 'bg-emerald-600/20 text-emerald-300' : 'bg-gray-800 text-amber-300'}`} title={hotel.qualification?.qualifiedAt ? 'Lead qualificado — editar' : 'Qualificar lead'}>
-                            <ClipboardCheck className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {onOpenProposalBuilder && (
-                          <button onClick={() => onOpenProposalBuilder(hotel)} className="rounded-lg bg-gray-800 p-1.5 text-emerald-300 transition hover:bg-gray-700" title="Proposta comercial">
-                            <BadgePercent className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        <button onClick={() => handleQuickUpdate(hotel, { commercialStatus: 'prepared' })} className="rounded-lg bg-gray-800 p-1.5 text-cyan-300 transition hover:bg-gray-700" title="Marcar preparado">
-                          <CheckCircle className="h-3.5 w-3.5" />
-                        </button>
-                        <button onClick={() => handleOpenEditModal(hotel)} className="rounded-lg bg-gray-800 p-1.5 text-emerald-300 transition hover:bg-gray-700" title="Editar">
-                          <Edit className="h-3.5 w-3.5" />
-                        </button>
-                        {onSelectProposal && (
-                          <button onClick={() => onSelectProposal(hotel)} className="rounded-lg bg-gray-800 p-1.5 text-blue-300 transition hover:bg-gray-700" title="Proposta">
-                            <FileText className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                        {onSelectChat && (
-                          <button onClick={() => onSelectChat(hotel)} className="rounded-lg bg-gray-800 p-1.5 text-purple-300 transition hover:bg-gray-700" title="IA">
-                            <Bot className="h-3.5 w-3.5" />
-                          </button>
-                        )}
                         <button onClick={() => handleDelete(hotel.id, hotel.companyName)} className="rounded-lg bg-gray-800 p-1.5 text-rose-300 transition hover:bg-rose-600 hover:text-white" title="Excluir">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
