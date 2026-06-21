@@ -11,6 +11,7 @@ import {
   Mail,
   MapPin,
   MessageSquare,
+  Monitor,
   Phone,
   Plus,
   ShieldOff,
@@ -85,12 +86,12 @@ const solProblems = [
 ];
 
 const solFeatures = [
-  { emoji: '🗺️', title: 'Mapa de quartos ao vivo', problem: 'Recepcao nao sabe quais quartos estao prontos para check-in', benefit: 'Recepcao e governanta veem o estado de cada quarto em tempo real: sujo, em limpeza, inspecionado ou pronto.' },
-  { emoji: '📋', title: 'Distribuicao de tarefas', problem: 'Governanta distribui quartos manualmente, em papel ou por mensagem', benefit: 'Sistema distribui automaticamente por camareira com base na carga, prioridade e tipo de quarto.' },
-  { emoji: '✅', title: 'Checklist digital de limpeza', problem: 'Padrao de limpeza depende da memoria e habito de cada pessoa', benefit: 'Guiao passo-a-passo no telemovel: camareira confirma cada item, governanta valida na inspecao.' },
-  { emoji: '🔧', title: 'Tickets de manutencao', problem: 'Avarias reportadas por WhatsApp e esquecidas ou sem responsavel', benefit: 'Pedido criado na hora com foto, responsavel atribuido automaticamente e historico completo.' },
-  { emoji: '📊', title: 'Dashboard da governanta', problem: 'Sem visibilidade de atrasos nem de quartos em risco antes do check-in', benefit: 'Visao consolidada de carga, atrasos, quartos em risco e produtividade da equipa.' },
-  { emoji: '📱', title: 'App mobile multilingue', problem: 'Staff resiste a tecnologia complexa ou em idioma que nao domina', benefit: 'Interface simples no smartphone do staff, disponivel em varios idiomas, sem formacao longa.' }
+  { emoji: '🗺️', title: 'Mapa de quartos ao vivo', problem: 'Recepcao nao sabe quais quartos estao prontos para check-in', benefit: 'Recepcao e governanta veem o estado de cada quarto em tempo real: sujo, em limpeza, inspecionado ou pronto.', image: '/materials/sol-02-mapa-quartos.png' },
+  { emoji: '📋', title: 'Distribuicao de tarefas', problem: 'Governanta distribui quartos manualmente, em papel ou por mensagem', benefit: 'Sistema distribui automaticamente por camareira com base na carga, prioridade e tipo de quarto.', image: '/materials/sol-03-painel-operacional.png' },
+  { emoji: '✅', title: 'Checklist digital de limpeza', problem: 'Padrao de limpeza depende da memoria e habito de cada pessoa', benefit: 'Guiao passo-a-passo no telemovel: camareira confirma cada item, governanta valida na inspecao.', image: '/materials/sol-04-checklists.png' },
+  { emoji: '🔧', title: 'Tickets de manutencao', problem: 'Avarias reportadas por WhatsApp e esquecidas ou sem responsavel', benefit: 'Pedido criado na hora com foto, responsavel atribuido automaticamente e historico completo.', image: '/materials/sol-06-manutencao.png' },
+  { emoji: '📊', title: 'Dashboard da governanta', problem: 'Sem visibilidade de atrasos nem de quartos em risco antes do check-in', benefit: 'Visao consolidada de carga, atrasos, quartos em risco e produtividade da equipa.', image: '/materials/sol-01-dashboard.png' },
+  { emoji: '📱', title: 'App mobile multilingue', problem: 'Staff resiste a tecnologia complexa ou em idioma que nao domina', benefit: 'Interface simples no smartphone do staff, disponivel em varios idiomas, sem formacao longa.', image: '/materials/sol-05-mobile.png' }
 ];
 
 const demoChecklist = [
@@ -317,6 +318,21 @@ const demoOptionalModules = [
   'Lost & Found (/lost-found)', 'Auditorias (/audits)',
   'Telefone Interno (/phone)', 'Areas Comuns (/common-areas)'
 ];
+
+const demoImages: Record<string, string> = {
+  dashboard: '/materials/sol-01-dashboard.png',
+  rooms: '/materials/sol-02-mapa-quartos.png',
+  tasks: '/materials/sol-03-painel-operacional.png',
+  checklists: '/materials/sol-04-checklists.png',
+  mobile: '/materials/sol-05-mobile.png',
+  maintenance: '/materials/sol-06-manutencao.png',
+  guests: '/materials/sol-07-hospedes.png',
+  messages: '/materials/sol-08-mensagens.png',
+  league: '/materials/sol-09-liga-limpeza.png',
+  shifts: '/materials/sol-10-escalas.png',
+  reports: '/materials/sol-11-relatorios.png',
+  ai: '/materials/sol-12-centro-ia.png',
+};
 
 // Banco de objeccoes (M28)
 const objectionBank: { objection: string; response: string }[] = [
@@ -954,15 +970,20 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                   </h3>
                   <div className="space-y-2">
                     {(dbMaterials.length > 0
-                      ? dbMaterials.map((m) => ({ emoji: '✦', title: m.title, problem: '', benefit: m.description || '' }))
+                      ? dbMaterials.map((m) => ({ emoji: '✦', title: m.title, problem: '', benefit: m.description || '', image: m.url || undefined }))
                       : solFeatures
                     ).map((f) => (
-                      <div key={f.title} className="flex items-start gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2.5 transition hover:border-emerald-200">
-                        <span className="mt-0.5 text-sm leading-none">{f.emoji}</span>
-                        <div className="min-w-0">
-                          <div className="text-[11px] font-bold text-emerald-700">{f.title}</div>
-                          {f.problem && <div className="mt-0.5 text-[10px] italic text-gray-400">Problema: {f.problem}</div>}
-                          <p className="mt-0.5 text-[11px] leading-relaxed text-gray-600">{f.benefit}</p>
+                      <div key={f.title} className="overflow-hidden rounded-lg border border-gray-100 bg-gray-50 transition hover:border-emerald-200">
+                        {f.image && (
+                          <img src={f.image} alt={f.title} className="h-24 w-full object-cover object-top" />
+                        )}
+                        <div className="flex items-start gap-2 p-2.5">
+                          <span className="mt-0.5 text-sm leading-none">{f.emoji}</span>
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-bold text-emerald-700">{f.title}</div>
+                            {f.problem && <div className="mt-0.5 text-[10px] italic text-gray-400">Problema: {f.problem}</div>}
+                            <p className="mt-0.5 text-[11px] leading-relaxed text-gray-600">{f.benefit}</p>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -1024,6 +1045,14 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                           <div className="border-t border-indigo-200 px-3 pb-3 pt-2 space-y-2">
                             {phase.route && (
                               <span className="inline-block rounded border border-indigo-300 bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700">{phase.route}</span>
+                            )}
+                            {demoImages[phase.id] && (
+                              <img
+                                src={demoImages[phase.id]}
+                                alt={phase.title}
+                                className="w-full rounded-lg border border-indigo-100 object-cover object-top"
+                                style={{ maxHeight: '130px' }}
+                              />
                             )}
                             {phase.show.length > 0 && (
                               <div>
@@ -1137,6 +1166,13 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               {b.label}
             </button>
           ))}
+          <button
+            onClick={() => window.open('https://sol.ecletika.com', '_blank')}
+            className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+          >
+            <Monitor className="h-3.5 w-3.5" />
+            Abrir demo comercial
+          </button>
           <div className="ml-auto flex items-center gap-3">
             <span className="text-[11px] text-gray-500">Estado final: <span className="font-bold text-gray-800">{statusButtons.find((b) => b.status === pendingStatus)?.label || pendingStatus}</span></span>
             <button
