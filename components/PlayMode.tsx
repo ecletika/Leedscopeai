@@ -978,6 +978,14 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                           {phase.route && (
                             <span className="inline-block rounded border border-indigo-300 bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700">{phase.route}</span>
                           )}
+                          {demoImages[phase.id] && (
+                            <img
+                              src={demoImages[phase.id]}
+                              alt={phase.title}
+                              className="w-full rounded-lg border border-indigo-100 object-cover object-top"
+                              style={{ maxHeight: '130px' }}
+                            />
+                          )}
                           {phase.show.length > 0 && (
                             <div>
                               <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">O que mostrar</div>
