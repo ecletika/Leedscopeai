@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import TwilioCall from './TwilioCall';
 import {
   AlertTriangle,
   Bot,
@@ -593,7 +594,21 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{lead.location}</span>
-                {lead.phone && <a href={`tel:${lead.phone}`} className="flex items-center gap-1 font-mono text-emerald-600 hover:underline"><Phone className="h-3 w-3" />{lead.phone}</a>}
+                {lead.phone && (
+                <span className="flex items-center gap-2">
+                  <a href={`tel:${lead.phone}`} className="flex items-center gap-1 font-mono text-emerald-600 hover:underline"><Phone className="h-3 w-3" />{lead.phone}</a>
+                  <TwilioCall
+                    phoneNumber={lead.phone}
+                    leadName={lead.companyName}
+                    onCallEnded={(secs) => {
+                      const mins = Math.floor(secs / 60);
+                      const secsRem = secs % 60;
+                      const durStr = mins > 0 ? `${mins}m ${secsRem}s` : `${secsRem}s`;
+                      setNotes((prev) => prev ? prev : `Chamada de ${durStr}.`);
+                    }}
+                  />
+                </span>
+              )}
                 {lead.email && <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-gray-600 hover:underline"><Mail className="h-3 w-3" />{lead.email}</a>}
                 {lead.website && <a href={lead.website} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-600 hover:underline"><Globe className="h-3 w-3" />Website</a>}
                 <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" />{sellerName}</span>

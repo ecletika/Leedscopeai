@@ -1946,5 +1946,58 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     }
   });
 
+  // ── TWILIO VOICE ────────────────────────────────────────────────────────────
+  const twilioSid     = process.env.TWILIO_ACCOUNT_SID;
+  const twilioKey     = process.env.TWILIO_API_KEY_SID;
+  const twilioSecret  = process.env.TWILIO_API_KEY_SECRET;
+  const twilioApp     = process.env.TWILIO_TWIML_APP_SID;
+  const twilioPhone   = process.env.TWILIO_PHONE_NUMBER;
+  const twilioReady   = twilioSid && twilioKey && twilioSecret && twilioApp;
+
+  // GET /api/twilio/token — Access Token para o browser SDK
+  app.get('/api/twilio/token', async (_req, res) => {
+    if (!twilioReady) {
+      return res.status(503).json({ error: 'Twilio nao configurado. Adicione TWILIO_ACCOUNT_SID, TWILIO_API_KEY_SID, TWILIO_API_KEY_SECRET e TWILIO_TWIML_APP_SID ao .env.local' });
+    }
+    try {
+      const tw = await import('twilio');
+      const AccessToken = (tw as any).default?.jwt?.AccessToken ?? (tw as any).jwt?.AccessToken;
+      const VoiceGrant  = AccessToken.VoiceGrant;
+
+      const grant = new VoiceGrant({ outgoingApplicationSid: twilioApp, incomingAllow: false });
+      const token = new AccessToken(twilioSid, twilioKey, twilioSecret, { identity: 'crm_seller', ttl: 3600 });
+      token.addGrant(grant);
+      res.json({ token: token.toJwt() });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Twilio token error: ' + err.message });
+    }
+  });
+
+  // POST /api/twilio/voice — TwiML para chamadas de saída (URL do TwiML App)
+  app.post('/api/twilio/voice', async (req, res) => {
+    try {
+      const tw = await import('twilio');
+      const VoiceResponse = (tw as any).default?.twiml?.VoiceResponse ?? (tw as any).twiml?.VoiceResponse;
+      const twiml = new VoiceResponse();
+      const to = req.body.To as string | undefined;
+      if (to) {
+        const dial = twiml.dial({ callerId: twilioPhone || '' });
+        dial.number(to);
+      } else {
+        twiml.say({ language: 'pt-PT' }, 'Numero de destino nao especificado.');
+      }
+      res.type('text/xml').send(twiml.toString());
+    } catch (err: any) {
+      res.status(500).json({ error: 'TwiML error: ' + err.message });
+    }
+  });
+
+  // POST /api/twilio/status — Webhook de estado (configure no Twilio Console)
+  app.post('/api/twilio/status', (req, res) => {
+    const { CallSid, CallStatus, CallDuration, To } = req.body;
+    console.log(`[Twilio] ${CallSid} → ${CallStatus} | ${CallDuration}s | To: ${To}`);
+    res.status(204).send();
+  });
+
   return app;
 }
