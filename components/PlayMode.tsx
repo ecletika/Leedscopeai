@@ -74,29 +74,247 @@ const presentationCards: { title: string; benefit: string }[] = [
   { title: 'App mobile multilingue', benefit: 'Staff de chao usa no telemovel, em varios idiomas, sem formacao complexa.' }
 ];
 
-const solPitchGuide = {
-  problems: [
-    'Quartos prontos tarde — recepcao nao sabe o estado em tempo real',
-    'Comunicacao feita por WhatsApp pessoal, sem registo nem auditoria',
-    'Governanta sem visao geral de carga e produtividade da equipa',
-    'Pedidos de manutencao perdem-se ou ficam sem follow-up',
-    'Dificil provar qualidade da limpeza a gestao ou a inspecoes'
-  ],
-  features: [
-    { emoji: '🗺️', title: 'Mapa de quartos ao vivo', problem: 'Recepcao nao sabe quais quartos estao prontos para check-in', benefit: 'Recepcao e governanta veem o estado de cada quarto em tempo real: sujo, em limpeza, inspecionado ou pronto.' },
-    { emoji: '📋', title: 'Distribuicao de tarefas', problem: 'Governanta distribui quartos manualmente, em papel ou por mensagem', benefit: 'Sistema distribui automaticamente por camareira com base na carga, prioridade e tipo de quarto.' },
-    { emoji: '✅', title: 'Checklist digital de limpeza', problem: 'Padrao de limpeza depende da memoria e habito de cada pessoa', benefit: 'Guiao passo-a-passo no telemovel: camareira confirma cada item, governanta valida na inspecao.' },
-    { emoji: '🔧', title: 'Tickets de manutencao', problem: 'Avarias reportadas por WhatsApp e esquecidas ou sem responsavel', benefit: 'Pedido criado na hora com foto, responsavel atribuido automaticamente e historico completo.' },
-    { emoji: '📊', title: 'Dashboard da governanta', problem: 'Sem visibilidade de atrasos nem de quartos em risco antes do check-in', benefit: 'Visao consolidada de carga, atrasos, quartos em risco e produtividade da equipa.' },
-    { emoji: '📱', title: 'App mobile multilingue', problem: 'Staff resiste a tecnologia complexa ou em idioma que nao domina', benefit: 'Interface simples no smartphone do staff, disponivel em varios idiomas, sem formacao longa.' }
-  ],
-  demoScript: [
-    { step: '1', action: 'Abrir o mapa de quartos ao vivo', tip: 'Impacto visual imediato — o gerente ve todos os quartos de uma vez' },
-    { step: '2', action: 'Simular camareira a concluir um quarto', tip: 'Mostrar que a recepcao ve a atualizacao em tempo real, sem ligar a ninguem' },
-    { step: '3', action: 'Criar um ticket de manutencao com foto', tip: 'Mostrar que fica registado, tem responsavel e nao se perde' },
-    { step: '4', action: 'Mostrar o dashboard da governanta', tip: 'Perguntar: "Quantos quartos tem hoje em risco de nao estarem prontos a tempo do check-in?"' }
-  ]
-};
+const solProblems = [
+  'Quartos prontos tarde — recepcao nao sabe o estado em tempo real',
+  'Comunicacao feita por WhatsApp pessoal, sem registo nem auditoria',
+  'Governanta sem visao geral de carga e produtividade da equipa',
+  'Pedidos de manutencao perdem-se ou ficam sem follow-up',
+  'Dificil provar qualidade da limpeza a gestao ou a inspecoes'
+];
+
+const solFeatures = [
+  { emoji: '🗺️', title: 'Mapa de quartos ao vivo', problem: 'Recepcao nao sabe quais quartos estao prontos para check-in', benefit: 'Recepcao e governanta veem o estado de cada quarto em tempo real: sujo, em limpeza, inspecionado ou pronto.' },
+  { emoji: '📋', title: 'Distribuicao de tarefas', problem: 'Governanta distribui quartos manualmente, em papel ou por mensagem', benefit: 'Sistema distribui automaticamente por camareira com base na carga, prioridade e tipo de quarto.' },
+  { emoji: '✅', title: 'Checklist digital de limpeza', problem: 'Padrao de limpeza depende da memoria e habito de cada pessoa', benefit: 'Guiao passo-a-passo no telemovel: camareira confirma cada item, governanta valida na inspecao.' },
+  { emoji: '🔧', title: 'Tickets de manutencao', problem: 'Avarias reportadas por WhatsApp e esquecidas ou sem responsavel', benefit: 'Pedido criado na hora com foto, responsavel atribuido automaticamente e historico completo.' },
+  { emoji: '📊', title: 'Dashboard da governanta', problem: 'Sem visibilidade de atrasos nem de quartos em risco antes do check-in', benefit: 'Visao consolidada de carga, atrasos, quartos em risco e produtividade da equipa.' },
+  { emoji: '📱', title: 'App mobile multilingue', problem: 'Staff resiste a tecnologia complexa ou em idioma que nao domina', benefit: 'Interface simples no smartphone do staff, disponivel em varios idiomas, sem formacao longa.' }
+];
+
+const demoChecklist = [
+  'Sistema SOL aberto no browser, logado como Admin Hotel',
+  'Comecar na tela: Dashboard (/dashboard)',
+  'Telemovel a mao para mostrar o App Mobile',
+  'Fechar outras abas desnecessarias',
+  'Tom: confiante, direto, consultivo — nao tecnico'
+];
+
+type DemoTip = { type: 'tip' | 'plus' | 'fast' | 'warn'; text: string };
+interface DemoPhase {
+  id: string; title: string; timer: string; acumulado: string;
+  route?: string; script: string; show: string[]; tips: DemoTip[];
+}
+
+const demoPhases: DemoPhase[] = [
+  {
+    id: 'abertura', title: '1. Abertura', timer: '2 min', acumulado: '2 min',
+    script: '"Antes de mostrar qualquer ecra, deixa-me fazer uma pergunta rapida: quantas mensagens em grupos de WhatsApp a vossa equipa troca por dia so para gerir limpezas, manutencao e pedidos de hospedes?" (pausa — deixa o cliente responder) "Pois e. O SOL foi criado exatamente para isso: tirar a gestao operacional do WhatsApp e coloca-la num sistema unico, inteligente e rastreavel. Em 30 minutos vou mostrar-vos como o SOL funciona na pratica — da limpeza de quartos ao relatorio executivo."',
+    show: [],
+    tips: [
+      { type: 'tip', text: 'Faca a pergunta do WhatsApp sempre. Ela gera identificacao imediata e abre o cliente para escutar.' },
+      { type: 'fast', text: 'Nao gaste tempo apresentando a empresa. Va direto ao ponto de dor.' }
+    ]
+  },
+  {
+    id: 'visao', title: '2. Visao Geral do Sistema', timer: '2 min', acumulado: '4 min',
+    script: '"O SOL e um sistema de gestao operacional hoteleira com 21 modulos integrados. Foi desenhado para tres perfis: Governanta e equipa de pisos, Direcao e chefias, e Recepcao. Tudo comunica em tempo real. Os tres problemas que resolve diretamente: falta de visibilidade, comunicacao fragmentada, e ausencia de dados."',
+    show: ['Mostrar o menu lateral brevemente enquanto fala — e visual e transmite a amplitude do sistema'],
+    tips: [
+      { type: 'fast', text: 'Nao entre em detalhe de cada modulo aqui. A demo faz esse trabalho.' }
+    ]
+  },
+  {
+    id: 'dashboard', title: '3. Dashboard SLA', timer: '2 min', acumulado: '6 min', route: '/dashboard',
+    script: '"Esta e a tela de controlo do diretor. Em qualquer momento, a qualquer hora, ele abre isto e sabe: quantos quartos estao sujos, quantos estao em limpeza, se ha atrasos de SLA e se ha manutencao pendente. Auto-atualiza a cada 30 segundos."',
+    show: [
+      'KPIs do topo: Quartos Sujos, Em Limpeza, Pend. Inspecao, SLA Cumprido, Manutencao aberta',
+      'Grafico "Quartos concluidos por hora"',
+      'Painel "Estado dos Quartos" com percentagens',
+      'Seccao "Quartos em Atraso (SLA)"'
+    ],
+    tips: [
+      { type: 'plus', text: 'Se cliente for diretor/GM, parem aqui. Pergunta gatilho: "Conseguem medir quanto tempo demora uma limpeza de checkout na vossa propriedade?"' },
+      { type: 'fast', text: 'Se cliente for governanta, passe rapidamente e va para o Mapa de Quartos.' }
+    ]
+  },
+  {
+    id: 'rooms', title: '4. Mapa de Quartos', timer: '2,5 min', acumulado: '8,5 min', route: '/rooms',
+    script: '"Este e o mapa de quartos em tempo real. Cada cor significa um estado diferente. Aqui vejo que o quarto 203 e VIP e tem Early Check-in confirmado — o sistema ja prioriza automaticamente este quarto na fila de limpeza. A equipa de pisos nao precisa de perguntar ao rececionista o que e urgente — o SOL ja sabe."',
+    show: [
+      'Cards de status no topo: Limpos, Sujos, Inspecao Pendente, Manutencao',
+      'Filtros por piso e tipo de quarto',
+      'Estados com cores: Verde (Limpo), Amarelo (Inspecao), Vermelho (Sujo), Azul (Ocupado), Cinza (Bloqueado)',
+      'Badge VIP e Early Check-in no quarto 203'
+    ],
+    tips: [
+      { type: 'plus', text: 'Clique num quarto para mostrar o historico de limpezas, tarefas e manutencoes.' },
+      { type: 'warn', text: 'Nao fique a explicar cada estado de cor. Mencione dois ou tres e avance.' }
+    ]
+  },
+  {
+    id: 'tasks', title: '5. Painel Operacional', timer: '2,5 min', acumulado: '11 min', route: '/tasks',
+    script: '"Este e o painel operacional da governanta. Ela ve a fila completa de tarefas — quartos e areas comuns. Do lado direito ve os colaboradores disponiveis e quantas tarefas cada um tem. Com um clique em Atribuicao Automatica, o sistema distribui tudo com base em algoritmo de prioridade. Acabou o \'Fulana, podes ir ao 203?\'"',
+    show: [
+      'Fila de limpeza com quartos e areas comuns',
+      'Painel lateral com colaboradores disponiveis e respetiva carga',
+      'Botao "Atribuicao Automatica"',
+      'Indicadores de urgencia (tag Urgente na Sala de Conferencias)'
+    ],
+    tips: [
+      { type: 'plus', text: 'Demonstre a atribuicao manual — selecionar colaborador e checklist no dropdown e clicar Atribuir.' },
+      { type: 'fast', text: 'Nao mostre todas as tarefas da fila. Dois ou tres exemplos chegam.' }
+    ]
+  },
+  {
+    id: 'checklists', title: '6. Checklists', timer: '1,5 min', acumulado: '12,5 min', route: '/checklists',
+    script: '"Cada tarefa tem um checklist associado. A funcionaria executa passo a passo pelo telemovel. O sistema sabe quanto tempo cada limpeza deve demorar. Se demorar mais, o supervisor e alertado automaticamente."',
+    show: [
+      'Lista de checklists ativos: Checkout, Stay-over, Areas Comuns',
+      'Variacao de tempo estimado por tipo (20 min, 45 min)',
+      'Aplicacao por tipo de quarto: Standard, Suite'
+    ],
+    tips: [
+      { type: 'plus', text: 'Se o cliente tiver interesse em padronizacao, abra um checklist e mostre os itens dentro.' },
+      { type: 'fast', text: 'Nao entre no modo de criacao de checklist. Isso e setup, nao demo.' }
+    ]
+  },
+  {
+    id: 'mobile', title: '7. App Mobile', timer: '2 min', acumulado: '14,5 min', route: '/mobile',
+    script: '"A equipa de pisos usa esta interface mobile — simples, facil de ler nos corredores. A funcionaria ve as tarefas do dia, executa o checklist, e quando termina, o quarto passa automaticamente para Aguarda Inspecao. A governanta recebe a notificacao no telemovel ou aqui no dashboard."',
+    show: [
+      'Visao da governanta: quartos por inspecionar, equipa ativa',
+      'Contador de tarefas: A limpar / Por iniciar / Inspecionar / Concluidas',
+      'Acesso rapido a tarefas, mensagens, passagem de turno'
+    ],
+    tips: [
+      { type: 'plus', text: 'Se questionarem adocao pela equipa, reforce: "Desenhado para ser usado por qualquer pessoa, sem formacao tecnica."' },
+      { type: 'fast', text: 'Nao entre nos menus internos do mobile agora.' }
+    ]
+  },
+  {
+    id: 'maintenance', title: '8. Manutencao', timer: '1,5 min', acumulado: '16 min', route: '/maintenance',
+    script: '"Qualquer colaborador pode abrir um ticket de manutencao — inclusive diretamente do checklist, quando encontra uma avaria durante a limpeza. O ticket vai para o tecnico responsavel, tem rastreabilidade completa e o sistema mede quanto tempo ficou em aberto."',
+    show: [
+      'KPIs: Abertos, Em progresso, Urgentes',
+      'Tabela de tickets com quarto, categoria, descricao, prioridade, estado, tecnico',
+      'Filtros por prioridade, categoria, tecnico'
+    ],
+    tips: [
+      { type: 'plus', text: 'Mostre o botao "Preventiva" para quem tem interesse em manutencao preventiva programada.' },
+      { type: 'fast', text: 'Nao abra cada ticket. Descreva o fluxo verbalmente.' }
+    ]
+  },
+  {
+    id: 'guests', title: '9. Pedidos dos Hospedes', timer: '2 min', acumulado: '18 min', route: '/guest-requests',
+    script: '"O hospede le um QR Code no quarto — nao precisa de instalar nada — e acede a um portal personalizado do hotel. Pode pedir room service, marcar servicos, ver informacoes do hotel e falar diretamente com a recepcao via chat. Tudo entra aqui, com alerta em tempo real."',
+    show: [
+      'Pedidos de menu ativos (Quarto 101, Quarto 104)',
+      'Abas: Pedidos e chat / Info do hotel / Agendamentos / Menu / Construtor',
+      'Chat com hospedes em tempo real'
+    ],
+    tips: [
+      { type: 'plus', text: 'Mostre o "Construtor" — onde o hotel personaliza o menu e as informacoes disponiveis para o hospede.' },
+      { type: 'fast', text: 'Nao entre nos detalhes de cada pedido listado.' }
+    ]
+  },
+  {
+    id: 'messages', title: '10. Mensagens', timer: '1 min', acumulado: '19 min', route: '/messages',
+    script: '"O SOL tem o seu proprio sistema de mensagens internas — por departamento, sem misturar conversas. E tem a Passagem de Turno digital: tudo o que aconteceu no turno fica registado e e partilhado com o turno seguinte com um clique."',
+    show: [
+      'Canais por departamento: Housekeeping, Manutencao, Recepcao, Geral',
+      'Mensagens em massa e chat com hospedes integrado',
+      'Passagem de turno no painel lateral'
+    ],
+    tips: [
+      { type: 'fast', text: 'Esta tela e muito intuitiva. Nao gaste mais de 1 minuto aqui.' }
+    ]
+  },
+  {
+    id: 'league', title: '11. Liga da Limpeza', timer: '1 min', acumulado: '20 min', route: '/housekeeping-league',
+    script: '"Este e o nosso elemento favorito. A Liga da Limpeza e um sistema de gamificacao: as funcionarias ganham pontos por cada limpeza aprovada, conquistam medalhas, sobem no ranking. Em hoteis que usam isto, a qualidade das inspecoes aumentou entre 15 a 20%."',
+    show: [
+      'Ranking de colaboradores com pontos e nota media',
+      'Medalhas conquistadas',
+      'Seccao "Aguardam avaliacao"'
+    ],
+    tips: [
+      { type: 'plus', text: 'Se o cliente tiver alto turnover ou problemas de motivacao, explore mais este modulo.' },
+      { type: 'fast', text: 'Para clientes focados em eficiencia pura, passe rapidamente.' }
+    ]
+  },
+  {
+    id: 'shifts', title: '12. Escalas', timer: '1 min', acumulado: '21 min', route: '/shifts',
+    script: '"A escala semanal esta aqui integrada. O gestor arrasta e larga os turnos, publica com um clique, e toda a equipa recebe automaticamente. Sem Excel, sem papel, sem confusao."',
+    show: [
+      'Vista semanal com colaboradores',
+      'Tipos de turno codificados por cor: Manha, Tarde, Noite, Ferias, Falta',
+      'Botao "Publicar Escala"'
+    ],
+    tips: [
+      { type: 'fast', text: 'Esta tela e autoexplicativa. Maximo 1 minuto.' }
+    ]
+  },
+  {
+    id: 'reports', title: '13. Relatorios', timer: '1,5 min', acumulado: '22,5 min', route: '/reports',
+    script: '"No final do mes — ou no final do dia — a direcao tem aqui relatorios completos de cada area: SLA de limpeza, ranking da equipa, tickets de manutencao, pedidos de hospedes, tudo cruzado. O relatorio executivo cruza dados de todos os modulos. Exporta em PDF com um clique."',
+    show: [
+      'Grid de categorias: Limpeza, Manutencao, Equipa, Hospedes, Inventario, Quartos, Auditorias...',
+      'Numeros em destaque: 128 tarefas, 59 tickets, 164 turnos'
+    ],
+    tips: [
+      { type: 'plus', text: 'Se cliente for GM ou investidor, entre num relatorio especifico e mostre os graficos.' },
+      { type: 'fast', text: 'Se cliente ja estiver convencido dos operacionais, passe rapidamente pelos relatorios.' }
+    ]
+  },
+  {
+    id: 'ai', title: '14. Centro IA', timer: '1 min', acumulado: '23,5 min', route: '/ai',
+    script: '"O Centro IA analisa padroes em segundo plano. Quando um quarto acumula tickets de manutencao recorrentes, o sistema alerta automaticamente a direcao. E manutencao preditiva — o hotel age antes que o hospede reclame."',
+    show: [
+      'Alerta critico: Quarto 101 — 5 tickets de manutencao nos ultimos 60 dias',
+      'Alerta de atencao: Quarto 302 — padrao de manutencao recorrente'
+    ],
+    tips: [
+      { type: 'fast', text: 'Tela de impacto, mas a mensagem e simples. Um minuto e suficiente.' }
+    ]
+  },
+  {
+    id: 'flow', title: '15. Fluxo Completo — Simulacao Real', timer: '2 min', acumulado: '25,5 min',
+    script: '"Vamos ver isto como um dia real de hotel. O hospede faz checkout as 11h. O quarto aparece automaticamente como Sujo no mapa. O sistema prioriza-o na fila — ainda mais se for VIP ou tiver Early Check-in a seguir. A governanta distribui a tarefa pelo app mobile. A funcionaria executa o checklist no telemovel. Ao terminar, manda para inspecao. A governanta inspeciona, aprova, e o quarto passa para Limpo. Se encontrar uma avaria, abre um ticket em 10 segundos. No final do turno, faz a passagem de turno digital. O diretor, em qualquer lugar, ve tudo no dashboard. Nenhuma mensagem de WhatsApp. Nenhum papel. Tudo rastreado."',
+    show: [],
+    tips: [
+      { type: 'tip', text: 'Fale devagar neste momento. Este e o clique da apresentacao.' }
+    ]
+  },
+  {
+    id: 'diferenciais', title: '16. Diferenciais do Sistema', timer: '2 min', acumulado: '27,5 min',
+    script: '"O que torna o SOL diferente de outros sistemas: 1) Tudo integrado — operacao inteira num unico sistema. 2) Tempo real — auto-atualizado a cada 30 segundos. 3) App Mobile simples — sem hardware adicional. 4) IA integrada — alertas preditivos, distribuicao inteligente. 5) Gamificacao — Liga da Limpeza, unico no mercado para housekeeping. 6) Dados estrategicos — relatorios cross-modulos. 7) Sem papel nem WhatsApp — operacao auditavel."',
+    show: [],
+    tips: [
+      { type: 'fast', text: 'Nao explique cada diferencial em detalhe. Dois ou tres frases por ponto. O cliente ja viu a demo — os diferenciais sao confirmacao do que ele acabou de ver.' }
+    ]
+  },
+  {
+    id: 'encerramento', title: '17. Encerramento e CTA', timer: '2 min', acumulado: '29,5 min',
+    script: '"Em resumo: o SOL e a diferenca entre gerir um hotel com WhatsApp e gerir com dados. Entre \'acho que esta limpo\' e \'confirmado, aprovado as 14h32\'." (pausa) "A pergunta que ficou para mim e: qual e o maior ponto de dor da vossa operacao hoje — limpeza, manutencao, comunicacao, ou visibilidade para a direcao?" (ouvir a resposta e ligar ao modulo que acabou de mostrar) "O proximo passo que sugiro e uma sessao de configuracao rapida com os dados do vosso hotel. Normalmente demora menos de uma semana. Quer que agendemos isso?"',
+    show: [],
+    tips: [
+      { type: 'tip', text: 'Termine sempre com pergunta aberta + proposta de proximo passo concreto. Nao termine com "alguma duvida?".' }
+    ]
+  }
+];
+
+const demoAdaptations = [
+  { role: 'GM / Diretor', start: 'Comece no Dashboard SLA' },
+  { role: 'Governanta', start: 'Comece no Mapa de Quartos' },
+  { role: 'Recepcao', start: 'Comece nos Pedidos de Hospedes' },
+  { role: 'Responsavel TI', start: 'Comece no Log de Auditoria' }
+];
+
+const demoOptionalModules = [
+  'Inventario (/inventory)', 'Sustentabilidade (/sustainability)',
+  'Lost & Found (/lost-found)', 'Auditorias (/audits)',
+  'Telefone Interno (/phone)', 'Areas Comuns (/common-areas)'
+];
 
 // Banco de objeccoes (M28)
 const objectionBank: { objection: string; response: string }[] = [
@@ -171,6 +389,8 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [aiLoading, setAiLoading] = useState(false);
   const [aiScore, setAiScore] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [demoCenterTab, setDemoCenterTab] = useState<'pitch' | 'demo'>('pitch');
+  const [activeDemoStep, setActiveDemoStep] = useState<string | null>(null);
 
   // Novo contacto
   const [newContactType, setNewContactType] = useState<CrmContactType>('manager');
@@ -559,69 +779,176 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           </div>
         </section>
 
-        {/* CENTRO — Guiao completo do SOL */}
-        <section className="flex w-[38%] shrink-0 flex-col gap-3 overflow-y-auto">
+        {/* CENTRO — Pitch rapido / Demo completa */}
+        <section className="flex w-[38%] shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
 
-          {/* Problemas que o SOL resolve */}
-          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
-            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-rose-600">
-              <AlertTriangle className="h-3.5 w-3.5" /> Problemas que o hotel tem agora
-            </h3>
-            <ul className="space-y-1.5">
-              {solPitchGuide.problems.map((p) => (
-                <li key={p} className="flex items-start gap-2 text-[12px] leading-snug text-rose-800">
-                  <span className="mt-0.5 shrink-0 text-rose-400">✕</span>
-                  {p}
-                </li>
-              ))}
-            </ul>
+          {/* Tabs */}
+          <div className="flex shrink-0 border-b border-gray-200">
+            <button
+              onClick={() => setDemoCenterTab('pitch')}
+              className={`flex-1 py-2.5 text-xs font-bold transition ${demoCenterTab === 'pitch' ? 'border-b-2 border-emerald-500 text-emerald-700' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Pitch rapido
+            </button>
+            <button
+              onClick={() => setDemoCenterTab('demo')}
+              className={`flex-1 py-2.5 text-xs font-bold transition ${demoCenterTab === 'demo' ? 'border-b-2 border-indigo-500 text-indigo-700' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Demo completa (30 min)
+            </button>
           </div>
 
-          {/* O que o SOL oferece — funcionalidades */}
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
-              <Sparkles className="h-3.5 w-3.5 text-emerald-500" /> O que o SOL resolve
-            </h3>
-            <div className="space-y-3">
-              {(dbMaterials.length > 0
-                ? dbMaterials.map((m) => ({ emoji: '✦', title: m.title, problem: '', benefit: m.description || '' }))
-                : solPitchGuide.features
-              ).map((f) => (
-                <div key={f.title} className="rounded-lg border border-gray-100 bg-gray-50 p-3 transition hover:border-emerald-200">
-                  <div className="flex items-start gap-2">
-                    <span className="mt-0.5 text-base leading-none">{f.emoji}</span>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-emerald-700">{f.title}</div>
-                      {f.problem && <div className="mt-0.5 text-[11px] italic text-gray-400">Problema: {f.problem}</div>}
-                      <p className="mt-1 text-[11px] leading-relaxed text-gray-600">{f.benefit}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <div className="flex-1 overflow-y-auto">
 
-          {/* Script para fechar a demo */}
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
-              <CalendarClock className="h-3.5 w-3.5" /> Script para fechar a demo
-            </h3>
-            <div className="space-y-2">
-              {solPitchGuide.demoScript.map((s) => (
-                <div key={s.step} className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-white p-2.5">
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">{s.step}</span>
-                  <div className="min-w-0">
-                    <div className="text-[12px] font-bold text-gray-800">{s.action}</div>
-                    <div className="mt-0.5 text-[11px] italic text-gray-500">{s.tip}</div>
+            {/* TAB PITCH RAPIDO */}
+            {demoCenterTab === 'pitch' && (
+              <div className="space-y-3 p-4">
+                {/* Problemas */}
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
+                  <h3 className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-rose-600">
+                    <AlertTriangle className="h-3 w-3" /> Problemas que o hotel tem agora
+                  </h3>
+                  <ul className="space-y-1">
+                    {solProblems.map((p) => (
+                      <li key={p} className="flex items-start gap-2 text-[11px] leading-snug text-rose-800">
+                        <span className="mt-0.5 shrink-0 text-rose-400">✕</span>{p}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Funcionalidades */}
+                <div>
+                  <h3 className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    <Sparkles className="h-3 w-3 text-emerald-500" /> O que o SOL resolve
+                  </h3>
+                  <div className="space-y-2">
+                    {(dbMaterials.length > 0
+                      ? dbMaterials.map((m) => ({ emoji: '✦', title: m.title, problem: '', benefit: m.description || '' }))
+                      : solFeatures
+                    ).map((f) => (
+                      <div key={f.title} className="flex items-start gap-2 rounded-lg border border-gray-100 bg-gray-50 p-2.5 transition hover:border-emerald-200">
+                        <span className="mt-0.5 text-sm leading-none">{f.emoji}</span>
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-bold text-emerald-700">{f.title}</div>
+                          {f.problem && <div className="mt-0.5 text-[10px] italic text-gray-400">Problema: {f.problem}</div>}
+                          <p className="mt-0.5 text-[11px] leading-relaxed text-gray-600">{f.benefit}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-              <div className="mt-1 rounded-lg border border-emerald-300 bg-emerald-600 p-3 text-center text-[12px] font-bold text-white">
-                "Faz sentido vermos isto juntos em 15 minutos? Quando e que tem 15 minutos livres esta semana?"
+
+                {/* CTA fechar demo */}
+                <div className="rounded-xl border border-emerald-300 bg-emerald-600 p-3 text-center">
+                  <p className="text-[12px] font-bold italic text-white">"Faz sentido vermos isto juntos em 15 minutos? Quando e que tem 15 minutos livres esta semana?"</p>
+                </div>
               </div>
-            </div>
-          </div>
+            )}
 
+            {/* TAB DEMO COMPLETA */}
+            {demoCenterTab === 'demo' && (
+              <div className="space-y-3 p-4">
+
+                {/* Checklist pre-demo */}
+                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+                  <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Checklist antes de comecar</h3>
+                  <ul className="space-y-1">
+                    {demoChecklist.map((item) => (
+                      <li key={item} className="flex items-center gap-2 text-[11px] text-indigo-800">
+                        <CheckCircle className="h-3 w-3 shrink-0 text-indigo-400" />{item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Adaptar pelo perfil */}
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Adaptar pelo perfil do cliente</h3>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {demoAdaptations.map((a) => (
+                      <div key={a.role} className="rounded border border-gray-200 bg-white p-2">
+                        <div className="text-[10px] font-bold text-gray-700">{a.role}</div>
+                        <div className="mt-0.5 text-[10px] italic text-gray-500">{a.start}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Fases da demo — acordeao */}
+                <div className="space-y-1.5">
+                  {demoPhases.map((phase) => {
+                    const isOpen = activeDemoStep === phase.id;
+                    return (
+                      <div key={phase.id} className={`overflow-hidden rounded-lg border transition ${isOpen ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                        <button
+                          onClick={() => setActiveDemoStep(isOpen ? null : phase.id)}
+                          className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                        >
+                          <span className={`flex-1 text-[12px] font-bold ${isOpen ? 'text-indigo-800' : 'text-gray-800'}`}>{phase.title}</span>
+                          <span className="shrink-0 rounded border border-gray-200 bg-white px-1.5 py-0.5 font-mono text-[9px] font-bold text-gray-500">{phase.timer}</span>
+                          <span className="shrink-0 text-[10px] font-bold text-gray-400">acum. {phase.acumulado}</span>
+                          <span className="shrink-0 text-gray-400">{isOpen ? '−' : '+'}</span>
+                        </button>
+                        {isOpen && (
+                          <div className="border-t border-indigo-200 px-3 pb-3 pt-2 space-y-2">
+                            {phase.route && (
+                              <span className="inline-block rounded border border-indigo-300 bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700">{phase.route}</span>
+                            )}
+                            {phase.show.length > 0 && (
+                              <div>
+                                <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">O que mostrar</div>
+                                <ul className="space-y-0.5">
+                                  {phase.show.map((s) => (
+                                    <li key={s} className="flex items-start gap-1.5 text-[11px] text-gray-700">
+                                      <span className="mt-0.5 shrink-0 text-indigo-400">→</span>{s}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            <div>
+                              <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">Script falado</div>
+                              <p className="rounded-lg border border-indigo-200 bg-white p-2 text-[11px] italic leading-relaxed text-gray-800">{phase.script}</p>
+                            </div>
+                            {phase.tips.length > 0 && (
+                              <div className="space-y-1">
+                                {phase.tips.map((tip, i) => {
+                                  const styles: Record<string, string> = {
+                                    tip: 'border-sky-200 bg-sky-50 text-sky-800',
+                                    plus: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+                                    fast: 'border-orange-200 bg-orange-50 text-orange-800',
+                                    warn: 'border-red-200 bg-red-50 text-red-800'
+                                  };
+                                  const labels: Record<string, string> = { tip: '✅ Dica', plus: '(+) Aprofunde', fast: '⚡ Acelere', warn: '⚠️ Cuidado' };
+                                  return (
+                                    <div key={i} className={`rounded border p-1.5 text-[10px] leading-snug ${styles[tip.type]}`}>
+                                      <span className="font-bold">{labels[tip.type]}: </span>{tip.text}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Modulos opcionais */}
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Modulos opcionais (se sobrar tempo)</h3>
+                  <div className="flex flex-wrap gap-1">
+                    {demoOptionalModules.map((m) => (
+                      <span key={m} className="rounded border border-gray-300 bg-white px-2 py-0.5 font-mono text-[10px] text-gray-600">{m}</span>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
+          </div>
         </section>
 
         {/* CANTO DIREITO — Banco de objeccoes */}
