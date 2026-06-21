@@ -4,7 +4,7 @@ let deviceInstance: Device | null = null;
 let tokenExpiry = 0;
 
 export async function getTwilioDevice(): Promise<Device> {
-  const { Device, Codec } = await import('@twilio/voice-sdk');
+  const { Device } = await import('@twilio/voice-sdk');
 
   const now = Date.now();
   if (deviceInstance && deviceInstance.state !== 'destroyed' && now < tokenExpiry) {
@@ -19,7 +19,7 @@ export async function getTwilioDevice(): Promise<Device> {
   deviceInstance?.destroy();
   deviceInstance = new Device(token, {
     logLevel: 1,
-    codecPreferences: [Codec.Opus, Codec.PCMU],
+    codecPreferences: ['opus', 'pcmu'] as any,
   });
   tokenExpiry = now + 3000 * 1000; // ~50 min (token dura 1h)
   await deviceInstance.register();
