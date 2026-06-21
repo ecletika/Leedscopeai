@@ -74,6 +74,30 @@ const presentationCards: { title: string; benefit: string }[] = [
   { title: 'App mobile multilingue', benefit: 'Staff de chao usa no telemovel, em varios idiomas, sem formacao complexa.' }
 ];
 
+const solPitchGuide = {
+  problems: [
+    'Quartos prontos tarde — recepcao nao sabe o estado em tempo real',
+    'Comunicacao feita por WhatsApp pessoal, sem registo nem auditoria',
+    'Governanta sem visao geral de carga e produtividade da equipa',
+    'Pedidos de manutencao perdem-se ou ficam sem follow-up',
+    'Dificil provar qualidade da limpeza a gestao ou a inspecoes'
+  ],
+  features: [
+    { emoji: '🗺️', title: 'Mapa de quartos ao vivo', problem: 'Recepcao nao sabe quais quartos estao prontos para check-in', benefit: 'Recepcao e governanta veem o estado de cada quarto em tempo real: sujo, em limpeza, inspecionado ou pronto.' },
+    { emoji: '📋', title: 'Distribuicao de tarefas', problem: 'Governanta distribui quartos manualmente, em papel ou por mensagem', benefit: 'Sistema distribui automaticamente por camareira com base na carga, prioridade e tipo de quarto.' },
+    { emoji: '✅', title: 'Checklist digital de limpeza', problem: 'Padrao de limpeza depende da memoria e habito de cada pessoa', benefit: 'Guiao passo-a-passo no telemovel: camareira confirma cada item, governanta valida na inspecao.' },
+    { emoji: '🔧', title: 'Tickets de manutencao', problem: 'Avarias reportadas por WhatsApp e esquecidas ou sem responsavel', benefit: 'Pedido criado na hora com foto, responsavel atribuido automaticamente e historico completo.' },
+    { emoji: '📊', title: 'Dashboard da governanta', problem: 'Sem visibilidade de atrasos nem de quartos em risco antes do check-in', benefit: 'Visao consolidada de carga, atrasos, quartos em risco e produtividade da equipa.' },
+    { emoji: '📱', title: 'App mobile multilingue', problem: 'Staff resiste a tecnologia complexa ou em idioma que nao domina', benefit: 'Interface simples no smartphone do staff, disponivel em varios idiomas, sem formacao longa.' }
+  ],
+  demoScript: [
+    { step: '1', action: 'Abrir o mapa de quartos ao vivo', tip: 'Impacto visual imediato — o gerente ve todos os quartos de uma vez' },
+    { step: '2', action: 'Simular camareira a concluir um quarto', tip: 'Mostrar que a recepcao ve a atualizacao em tempo real, sem ligar a ninguem' },
+    { step: '3', action: 'Criar um ticket de manutencao com foto', tip: 'Mostrar que fica registado, tem responsavel e nao se perde' },
+    { step: '4', action: 'Mostrar o dashboard da governanta', tip: 'Perguntar: "Quantos quartos tem hoje em risco de nao estarem prontos a tempo do check-in?"' }
+  ]
+};
+
 // Banco de objeccoes (M28)
 const objectionBank: { objection: string; response: string }[] = [
   { objection: 'Ja usamos WhatsApp', response: 'O WhatsApp ajuda no inicio, mas nao cria historico, auditoria, prioridades nem relatorios. O SOL organiza a operacao sem complicar a equipa.' },
@@ -535,26 +559,69 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           </div>
         </section>
 
-        {/* CENTRO — Mini apresentacao SOL em destaque */}
-        <section className="flex w-[38%] shrink-0 flex-col overflow-y-auto">
+        {/* CENTRO — Guiao completo do SOL */}
+        <section className="flex w-[38%] shrink-0 flex-col gap-3 overflow-y-auto">
+
+          {/* Problemas que o SOL resolve */}
+          <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-rose-600">
+              <AlertTriangle className="h-3.5 w-3.5" /> Problemas que o hotel tem agora
+            </h3>
+            <ul className="space-y-1.5">
+              {solPitchGuide.problems.map((p) => (
+                <li key={p} className="flex items-start gap-2 text-[12px] leading-snug text-rose-800">
+                  <span className="mt-0.5 shrink-0 text-rose-400">✕</span>
+                  {p}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* O que o SOL oferece — funcionalidades */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h3 className="mb-4 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
+            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-500">
               <Sparkles className="h-3.5 w-3.5 text-emerald-500" /> O que o SOL resolve
             </h3>
-            <div className="grid grid-cols-2 gap-3">
-              {materials.map((card) => (
-                <div key={card.title} className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50 shadow-sm transition hover:border-emerald-200 hover:shadow-md">
-                  {card.url && (
-                    <img src={card.url} alt={card.title} className="aspect-video w-full object-cover" loading="lazy" />
-                  )}
-                  <div className="p-3">
-                    <div className="text-xs font-bold text-emerald-700">{card.title}</div>
-                    <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{card.benefit}</p>
+            <div className="space-y-3">
+              {(dbMaterials.length > 0
+                ? dbMaterials.map((m) => ({ emoji: '✦', title: m.title, problem: '', benefit: m.description || '' }))
+                : solPitchGuide.features
+              ).map((f) => (
+                <div key={f.title} className="rounded-lg border border-gray-100 bg-gray-50 p-3 transition hover:border-emerald-200">
+                  <div className="flex items-start gap-2">
+                    <span className="mt-0.5 text-base leading-none">{f.emoji}</span>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-emerald-700">{f.title}</div>
+                      {f.problem && <div className="mt-0.5 text-[11px] italic text-gray-400">Problema: {f.problem}</div>}
+                      <p className="mt-1 text-[11px] leading-relaxed text-gray-600">{f.benefit}</p>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Script para fechar a demo */}
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <h3 className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
+              <CalendarClock className="h-3.5 w-3.5" /> Script para fechar a demo
+            </h3>
+            <div className="space-y-2">
+              {solPitchGuide.demoScript.map((s) => (
+                <div key={s.step} className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-white p-2.5">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white">{s.step}</span>
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-bold text-gray-800">{s.action}</div>
+                    <div className="mt-0.5 text-[11px] italic text-gray-500">{s.tip}</div>
+                  </div>
+                </div>
+              ))}
+              <div className="mt-1 rounded-lg border border-emerald-300 bg-emerald-600 p-3 text-center text-[12px] font-bold text-white">
+                "Faz sentido vermos isto juntos em 15 minutos? Quando e que tem 15 minutos livres esta semana?"
+              </div>
+            </div>
+          </div>
+
         </section>
 
         {/* CANTO DIREITO — Banco de objeccoes */}
