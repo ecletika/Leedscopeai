@@ -407,7 +407,6 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [aiLoading, setAiLoading] = useState(false);
   const [aiScore, setAiScore] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  const [demoCenterTab, setDemoCenterTab] = useState<'pitch' | 'demo'>('pitch');
   const [activeDemoStep, setActiveDemoStep] = useState<string | null>(null);
 
   // Enriquecimento de dados via Google Places
@@ -925,188 +924,112 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           </div>
         </section>
 
-        {/* CENTRO — Pitch rapido / Demo completa */}
+        {/* CENTRO — Demo completa 30 min */}
         <section className="flex w-[38%] shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-
-          {/* Tabs */}
-          <div className="flex shrink-0 border-b border-gray-200">
-            <button
-              onClick={() => setDemoCenterTab('pitch')}
-              className={`flex-1 py-2.5 text-xs font-bold transition ${demoCenterTab === 'pitch' ? 'border-b-2 border-emerald-500 text-emerald-700' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Pitch rapido
-            </button>
-            <button
-              onClick={() => setDemoCenterTab('demo')}
-              className={`flex-1 py-2.5 text-xs font-bold transition ${demoCenterTab === 'demo' ? 'border-b-2 border-indigo-500 text-indigo-700' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Demo completa (30 min)
-            </button>
+          <div className="shrink-0 border-b border-gray-200 px-4 py-2.5">
+            <span className="text-xs font-bold text-indigo-700">Demo completa — 30 min</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
+            <div className="space-y-3 p-4">
 
-            {/* TAB PITCH RAPIDO */}
-            {demoCenterTab === 'pitch' && (
-              <div className="space-y-3 p-4">
-                {/* Problemas */}
-                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3">
-                  <h3 className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-rose-600">
-                    <AlertTriangle className="h-3 w-3" /> Problemas que o hotel tem agora
-                  </h3>
-                  <ul className="space-y-1">
-                    {solProblems.map((p) => (
-                      <li key={p} className="flex items-start gap-2 text-[11px] leading-snug text-rose-800">
-                        <span className="mt-0.5 shrink-0 text-rose-400">✕</span>{p}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {/* Checklist pre-demo */}
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
+                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Checklist antes de comecar</h3>
+                <ul className="space-y-1">
+                  {demoChecklist.map((item) => (
+                    <li key={item} className="flex items-center gap-2 text-[11px] text-indigo-800">
+                      <CheckCircle className="h-3 w-3 shrink-0 text-indigo-400" />{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
 
-                {/* Funcionalidades */}
-                <div>
-                  <h3 className="mb-2 flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                    <Sparkles className="h-3 w-3 text-emerald-500" /> O que o SOL resolve
-                  </h3>
-                  <div className="space-y-2">
-                    {(dbMaterials.length > 0
-                      ? dbMaterials.map((m) => ({ emoji: '✦', title: m.title, problem: '', benefit: m.description || '', image: m.url || undefined }))
-                      : solFeatures
-                    ).map((f) => (
-                      <div key={f.title} className="overflow-hidden rounded-lg border border-gray-100 bg-gray-50 transition hover:border-emerald-200">
-                        {f.image && (
-                          <img src={f.image} alt={f.title} className="h-24 w-full object-cover object-top" />
-                        )}
-                        <div className="flex items-start gap-2 p-2.5">
-                          <span className="mt-0.5 text-sm leading-none">{f.emoji}</span>
-                          <div className="min-w-0">
-                            <div className="text-[11px] font-bold text-emerald-700">{f.title}</div>
-                            {f.problem && <div className="mt-0.5 text-[10px] italic text-gray-400">Problema: {f.problem}</div>}
-                            <p className="mt-0.5 text-[11px] leading-relaxed text-gray-600">{f.benefit}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* CTA fechar demo */}
-                <div className="rounded-xl border border-emerald-300 bg-emerald-600 p-3 text-center">
-                  <p className="text-[12px] font-bold italic text-white">"Faz sentido vermos isto juntos em 15 minutos? Quando e que tem 15 minutos livres esta semana?"</p>
+              {/* Adaptar pelo perfil */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Adaptar pelo perfil do cliente</h3>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {demoAdaptations.map((a) => (
+                    <div key={a.role} className="rounded border border-gray-200 bg-white p-2">
+                      <div className="text-[10px] font-bold text-gray-700">{a.role}</div>
+                      <div className="mt-0.5 text-[10px] italic text-gray-500">{a.start}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
 
-            {/* TAB DEMO COMPLETA */}
-            {demoCenterTab === 'demo' && (
-              <div className="space-y-3 p-4">
-
-                {/* Checklist pre-demo */}
-                <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
-                  <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Checklist antes de comecar</h3>
-                  <ul className="space-y-1">
-                    {demoChecklist.map((item) => (
-                      <li key={item} className="flex items-center gap-2 text-[11px] text-indigo-800">
-                        <CheckCircle className="h-3 w-3 shrink-0 text-indigo-400" />{item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Adaptar pelo perfil */}
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Adaptar pelo perfil do cliente</h3>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {demoAdaptations.map((a) => (
-                      <div key={a.role} className="rounded border border-gray-200 bg-white p-2">
-                        <div className="text-[10px] font-bold text-gray-700">{a.role}</div>
-                        <div className="mt-0.5 text-[10px] italic text-gray-500">{a.start}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Fases da demo — acordeao */}
-                <div className="space-y-1.5">
-                  {demoPhases.map((phase) => {
-                    const isOpen = activeDemoStep === phase.id;
-                    return (
-                      <div key={phase.id} className={`overflow-hidden rounded-lg border transition ${isOpen ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                        <button
-                          onClick={() => setActiveDemoStep(isOpen ? null : phase.id)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left"
-                        >
-                          <span className={`flex-1 text-[12px] font-bold ${isOpen ? 'text-indigo-800' : 'text-gray-800'}`}>{phase.title}</span>
-                          <span className="shrink-0 rounded border border-gray-200 bg-white px-1.5 py-0.5 font-mono text-[9px] font-bold text-gray-500">{phase.timer}</span>
-                          <span className="shrink-0 text-[10px] font-bold text-gray-400">acum. {phase.acumulado}</span>
-                          <span className="shrink-0 text-gray-400">{isOpen ? '−' : '+'}</span>
-                        </button>
-                        {isOpen && (
-                          <div className="border-t border-indigo-200 px-3 pb-3 pt-2 space-y-2">
-                            {phase.route && (
-                              <span className="inline-block rounded border border-indigo-300 bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700">{phase.route}</span>
-                            )}
-                            {demoImages[phase.id] && (
-                              <img
-                                src={demoImages[phase.id]}
-                                alt={phase.title}
-                                className="w-full rounded-lg border border-indigo-100 object-cover object-top"
-                                style={{ maxHeight: '130px' }}
-                              />
-                            )}
-                            {phase.show.length > 0 && (
-                              <div>
-                                <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">O que mostrar</div>
-                                <ul className="space-y-0.5">
-                                  {phase.show.map((s) => (
-                                    <li key={s} className="flex items-start gap-1.5 text-[11px] text-gray-700">
-                                      <span className="mt-0.5 shrink-0 text-indigo-400">→</span>{s}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
+              {/* Fases da demo — acordeao */}
+              <div className="space-y-1.5">
+                {demoPhases.map((phase) => {
+                  const isOpen = activeDemoStep === phase.id;
+                  return (
+                    <div key={phase.id} className={`overflow-hidden rounded-lg border transition ${isOpen ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                      <button
+                        onClick={() => setActiveDemoStep(isOpen ? null : phase.id)}
+                        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                      >
+                        <span className={`flex-1 text-[12px] font-bold ${isOpen ? 'text-indigo-800' : 'text-gray-800'}`}>{phase.title}</span>
+                        <span className="shrink-0 rounded border border-gray-200 bg-white px-1.5 py-0.5 font-mono text-[9px] font-bold text-gray-500">{phase.timer}</span>
+                        <span className="shrink-0 text-[10px] font-bold text-gray-400">acum. {phase.acumulado}</span>
+                        <span className="shrink-0 text-gray-400">{isOpen ? '−' : '+'}</span>
+                      </button>
+                      {isOpen && (
+                        <div className="border-t border-indigo-200 px-3 pb-3 pt-2 space-y-2">
+                          {phase.route && (
+                            <span className="inline-block rounded border border-indigo-300 bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700">{phase.route}</span>
+                          )}
+                          {phase.show.length > 0 && (
                             <div>
-                              <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">Script falado</div>
-                              <p className="rounded-lg border border-indigo-200 bg-white p-2 text-[11px] italic leading-relaxed text-gray-800">{phase.script}</p>
+                              <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">O que mostrar</div>
+                              <ul className="space-y-0.5">
+                                {phase.show.map((s) => (
+                                  <li key={s} className="flex items-start gap-1.5 text-[11px] text-gray-700">
+                                    <span className="mt-0.5 shrink-0 text-indigo-400">→</span>{s}
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
-                            {phase.tips.length > 0 && (
-                              <div className="space-y-1">
-                                {phase.tips.map((tip, i) => {
-                                  const styles: Record<string, string> = {
-                                    tip: 'border-sky-200 bg-sky-50 text-sky-800',
-                                    plus: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-                                    fast: 'border-orange-200 bg-orange-50 text-orange-800',
-                                    warn: 'border-red-200 bg-red-50 text-red-800'
-                                  };
-                                  const labels: Record<string, string> = { tip: '✅ Dica', plus: '(+) Aprofunde', fast: '⚡ Acelere', warn: '⚠️ Cuidado' };
-                                  return (
-                                    <div key={i} className={`rounded border p-1.5 text-[10px] leading-snug ${styles[tip.type]}`}>
-                                      <span className="font-bold">{labels[tip.type]}: </span>{tip.text}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
+                          )}
+                          <div>
+                            <div className="mb-1 text-[9px] font-bold uppercase tracking-wider text-gray-400">Script falado</div>
+                            <p className="rounded-lg border border-indigo-200 bg-white p-2 text-[11px] italic leading-relaxed text-gray-800">{phase.script}</p>
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Modulos opcionais */}
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Modulos opcionais (se sobrar tempo)</h3>
-                  <div className="flex flex-wrap gap-1">
-                    {demoOptionalModules.map((m) => (
-                      <span key={m} className="rounded border border-gray-300 bg-white px-2 py-0.5 font-mono text-[10px] text-gray-600">{m}</span>
-                    ))}
-                  </div>
-                </div>
-
+                          {phase.tips.length > 0 && (
+                            <div className="space-y-1">
+                              {phase.tips.map((tip, i) => {
+                                const styles: Record<string, string> = {
+                                  tip: 'border-sky-200 bg-sky-50 text-sky-800',
+                                  plus: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+                                  fast: 'border-orange-200 bg-orange-50 text-orange-800',
+                                  warn: 'border-red-200 bg-red-50 text-red-800'
+                                };
+                                const labels: Record<string, string> = { tip: '✅ Dica', plus: '(+) Aprofunde', fast: '⚡ Acelere', warn: '⚠️ Cuidado' };
+                                return (
+                                  <div key={i} className={`rounded border p-1.5 text-[10px] leading-snug ${styles[tip.type]}`}>
+                                    <span className="font-bold">{labels[tip.type]}: </span>{tip.text}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            )}
+
+              {/* Modulos opcionais */}
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Modulos opcionais (se sobrar tempo)</h3>
+                <div className="flex flex-wrap gap-1">
+                  {demoOptionalModules.map((m) => (
+                    <span key={m} className="rounded border border-gray-300 bg-white px-2 py-0.5 font-mono text-[10px] text-gray-600">{m}</span>
+                  ))}
+                </div>
+              </div>
+
+            </div>
           </div>
         </section>
 
