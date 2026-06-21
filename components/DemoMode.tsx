@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  Bot,
   CalendarClock,
   Check,
   Copy,
@@ -13,8 +12,7 @@ import {
   Users,
   X
 } from 'lucide-react';
-import { CrmMaterial, Lead, NextActionType } from '../types';
-import { crmDb } from '../services/crmDb';
+import { Lead, NextActionType } from '../types';
 import { hotelDb } from '../services/hotelDb';
 import { downloadLeadIcs } from '../services/calendar';
 
@@ -36,9 +34,23 @@ const personas: { key: PersonaKey; label: string }[] = [
   { key: 'group', label: 'Grupo' }
 ];
 
-// Slides de valor: problema -> solucao -> modulo SOL (imagem) -> beneficio. Filtrados por persona.
+// Imagens locais claras por numero de modulo SOL
+const MODULE_IMAGES: Record<number, string> = {
+  1:  '/materials/sol-02-mapa-quartos.png',
+  3:  '/materials/sol-04-checklists.png',
+  4:  '/materials/sol-03-painel-operacional.png',
+  5:  '/materials/sol-04-checklists.png',
+  6:  '/materials/sol-06-manutencao.png',
+  10: '/materials/sol-07-hospedes.png',
+  11: '/materials/sol-11-relatorios.png',
+  12: '/materials/sol-11-relatorios.png',
+  13: '/materials/sol-01-dashboard.png',
+  14: '/materials/sol-05-mobile.png',
+  17: '/materials/sol-09-liga-limpeza.png',
+};
+
 interface ValueSlide {
-  module: number; // numero do modulo SOL (M1..M20) para buscar a imagem real
+  module: number;
   problem: string;
   solution: string;
   benefit: string;
@@ -103,13 +115,6 @@ const VALUE_SLIDES: ValueSlide[] = [
     personas: ['all', 'manager', 'owner', 'group']
   },
   {
-    module: 20,
-    problem: 'Gerir varios hoteis num grupo e disperso.',
-    solution: 'Multi-propriedade: acompanhar varias unidades numa plataforma, com relatorios por unidade, equipa, cidade ou grupo.',
-    benefit: 'Visao consolidada do grupo.',
-    personas: ['all', 'owner', 'group']
-  },
-  {
     module: 14,
     problem: 'A equipa de chao nao trabalha sentada ao computador.',
     solution: 'App mobile-first: abrir tarefas, preencher checklists, enviar fotos e atualizar estados no telemovel.',
@@ -118,7 +123,6 @@ const VALUE_SLIDES: ValueSlide[] = [
   }
 ];
 
-// Comparador SOL vs WhatsApp/Papel (M36)
 const COMPARATOR: { topic: string; old: string; sol: string }[] = [
   { topic: 'Estado dos quartos', old: 'Manual / chamadas', sol: 'Tempo real' },
   { topic: 'Historico', old: 'Perdido', sol: 'Guardado' },
@@ -138,32 +142,16 @@ const plusDaysIso = (days: number) => {
 };
 
 export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
-  const [materials, setMaterials] = useState<CrmMaterial[]>([]);
   const [persona, setPersona] = useState<PersonaKey>('all');
   const [index, setIndex] = useState(0);
   const [copied, setCopied] = useState(false);
   const [savingAction, setSavingAction] = useState(false);
-
-  useEffect(() => {
-    crmDb.getMaterials().then((rows) => setMaterials(rows.filter((m) => m.active)));
-  }, []);
-
-  // imagem real por numero de modulo (titulos "M1 · ...", url /materials/mNN.png)
-  const imageByModule = useMemo(() => {
-    const map: Record<number, string> = {};
-    materials.forEach((m) => {
-      const match = /m(\d+)/i.exec(m.url || '') || /^M(\d+)/i.exec(m.title || '');
-      if (match && m.url) map[parseInt(match[1], 10)] = m.url;
-    });
-    return map;
-  }, [materials]);
 
   const valueSlides = useMemo(
     () => VALUE_SLIDES.filter((s) => s.personas.includes(persona)),
     [persona]
   );
 
-  // estrutura de slides: capa + slides de valor + comparador + proximos passos
   const totalSlides = valueSlides.length + 3;
   const clampedIndex = Math.min(index, totalSlides - 1);
 
@@ -198,9 +186,7 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
       await navigator.clipboard.writeText(pitchText);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
-    } catch {
-      /* ignore */
-    }
+    } catch { /* ignore */ }
   };
 
   const emailHref = `mailto:${lead.email || ''}?subject=${encodeURIComponent(`SOL para o ${lead.companyName}`)}&body=${encodeURIComponent(pitchText)}`;
@@ -226,69 +212,77 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
     }
   };
 
-  // ----- render do slide atual -----
   const renderSlide = () => {
+    // Slide 0 — capa
     if (clampedIndex === 0) {
       return (
         <div className="flex h-full flex-col items-center justify-center text-center">
           <div className="mb-4 flex items-center gap-3">
-            <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-5xl font-black text-transparent">SOL</span>
+            <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-6xl font-black text-transparent">SOL</span>
           </div>
-          <h1 className="max-w-2xl text-3xl font-bold text-white">Operacao de housekeeping em tempo real</h1>
-          <p className="mt-3 max-w-xl text-sm text-gray-400">Apresentacao preparada para <span className="font-bold text-emerald-300">{lead.companyName}</span></p>
-          <p className="mt-8 text-xs text-gray-500">Use as setas ← → para avancar. Escolha a pessoa com quem fala em cima.</p>
+          <h1 className="max-w-2xl text-3xl font-bold text-gray-900">Operacao de housekeeping em tempo real</h1>
+          <p className="mt-3 max-w-xl text-sm text-gray-500">Apresentacao preparada para <span className="font-bold text-emerald-700">{lead.companyName}</span></p>
+          <p className="mt-8 text-xs text-gray-400">Use as setas ← → para avancar. Escolha a pessoa com quem fala em cima.</p>
         </div>
       );
     }
 
+    // Slides de valor
     if (clampedIndex >= 1 && clampedIndex <= valueSlides.length) {
       const slide = valueSlides[clampedIndex - 1];
-      const img = imageByModule[slide.module];
+      const img = MODULE_IMAGES[slide.module];
       return (
-        <div className="grid h-full grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid h-full grid-cols-1 gap-8 lg:grid-cols-2">
           <div className="flex flex-col justify-center">
-            <span className="mb-3 inline-flex w-fit items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-3 py-1 text-[11px] font-bold text-rose-300">Problema</span>
-            <h2 className="text-2xl font-bold text-white">{slide.problem}</h2>
+            <span className="mb-3 inline-flex w-fit items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-bold text-rose-600">Problema</span>
+            <h2 className="text-2xl font-bold text-gray-900">{slide.problem}</h2>
             <div className="mt-6">
-              <span className="mb-2 inline-flex w-fit items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[11px] font-bold text-emerald-300">Como o SOL resolve</span>
-              <p className="text-base leading-relaxed text-gray-200">{slide.solution}</p>
+              <span className="mb-2 inline-flex w-fit items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">Como o SOL resolve</span>
+              <p className="text-base leading-relaxed text-gray-700">{slide.solution}</p>
             </div>
-            <div className="mt-6 flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] px-4 py-3">
-              <Sparkles className="h-4 w-4 text-emerald-400" />
-              <span className="text-sm font-semibold text-emerald-200">{slide.benefit}</span>
+            <div className="mt-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <Sparkles className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm font-semibold text-emerald-700">{slide.benefit}</span>
             </div>
           </div>
           <div className="flex items-center justify-center">
             {img ? (
-              <img src={img} alt={slide.problem} className="max-h-[62vh] w-full rounded-xl border border-gray-800 object-contain shadow-2xl" />
+              <img
+                src={img}
+                alt={slide.problem}
+                className="max-h-[62vh] w-full rounded-2xl border border-gray-200 object-contain shadow-lg"
+              />
             ) : (
-              <div className="flex h-64 w-full items-center justify-center rounded-xl border border-dashed border-gray-700 text-xs text-gray-600">Imagem do modulo M{slide.module}</div>
+              <div className="flex h-64 w-full items-center justify-center rounded-2xl border-2 border-dashed border-gray-200 text-sm text-gray-400">
+                Imagem do modulo M{slide.module}
+              </div>
             )}
           </div>
         </div>
       );
     }
 
+    // Slide comparador
     if (clampedIndex === valueSlides.length + 1) {
       return (
         <div className="flex h-full flex-col justify-center">
-          <h2 className="mb-1 text-2xl font-bold text-white">SOL vs WhatsApp / Papel / Excel</h2>
-          <p className="mb-5 text-sm text-gray-400">Muitos hoteis comecam no WhatsApp. Eis a diferenca na pratica.</p>
-          <div className="overflow-hidden rounded-xl border border-gray-800">
+          <h2 className="mb-1 text-2xl font-bold text-gray-900">SOL vs WhatsApp / Papel / Excel</h2>
+          <p className="mb-5 text-sm text-gray-500">Muitos hoteis comecam no WhatsApp. Eis a diferenca na pratica.</p>
+          <div className="overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-gray-800 bg-ai-dark text-[11px] font-bold uppercase tracking-wider text-gray-400">
+                <tr className="border-b border-gray-200 bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500">
                   <th className="px-4 py-3">Processo</th>
-                  <th className="px-4 py-3 text-rose-300">WhatsApp / Papel</th>
-                  <th className="px-4 py-3 text-emerald-300">SOL</th>
+                  <th className="px-4 py-3 text-rose-600">WhatsApp / Papel</th>
+                  <th className="px-4 py-3 text-emerald-700">SOL</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800/80">
+              <tbody className="divide-y divide-gray-100">
                 {COMPARATOR.map((r) => (
-                  <tr key={r.topic}>
-                    <td className="px-4 py-2.5 font-semibold text-white">{r.topic}</td>
+                  <tr key={r.topic} className="hover:bg-gray-50">
+                    <td className="px-4 py-2.5 font-semibold text-gray-900">{r.topic}</td>
                     <td className="px-4 py-2.5 text-gray-400">{r.old}</td>
-                    <td className="px-4 py-2.5 font-semibold text-emerald-300">{r.sol}</td>
+                    <td className="px-4 py-2.5 font-semibold text-emerald-700">{r.sol}</td>
                   </tr>
                 ))}
               </tbody>
@@ -298,67 +292,69 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
       );
     }
 
-    // proximos passos
+    // Slide proximos passos
     return (
       <div className="flex h-full flex-col items-center justify-center text-center">
-        <Check className="mb-4 h-12 w-12 text-emerald-400" />
-        <h2 className="text-3xl font-bold text-white">Proximo passo</h2>
-        <p className="mt-3 max-w-xl text-base text-gray-300">Vamos marcar uma apresentacao rapida de 15 a 20 minutos para mostrar o SOL a funcionar com os dados do {lead.companyName}?</p>
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+          <Check className="h-8 w-8 text-emerald-600" />
+        </div>
+        <h2 className="text-3xl font-bold text-gray-900">Proximo passo</h2>
+        <p className="mt-3 max-w-xl text-base text-gray-600">Vamos marcar uma apresentacao rapida de 15 a 20 minutos para mostrar o SOL a funcionar com os dados do {lead.companyName}?</p>
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <button onClick={scheduleDemo} disabled={savingAction} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-sm font-bold text-white transition hover:bg-emerald-500 disabled:opacity-60">
+          <button onClick={scheduleDemo} disabled={savingAction} className="flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60">
             {savingAction ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />} Marcar demo (amanha)
           </button>
-          {lead.email && <a href={emailHref} className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-sm font-bold text-sky-300 hover:bg-gray-700"><Mail className="h-4 w-4" /> Enviar por email</a>}
-          {lead.phone && <a href={whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-sm font-bold text-green-300 hover:bg-gray-700"><MessageCircle className="h-4 w-4" /> WhatsApp</a>}
-          <button onClick={() => downloadLeadIcs(lead, { start: new Date(plusDaysIso(1)), title: `SOL Demo — ${lead.companyName}`, durationMinutes: 30 })} className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-4 py-3 text-sm font-bold text-indigo-300 hover:bg-gray-700"><CalendarClock className="h-4 w-4" /> Adicionar ao calendario</button>
+          {lead.email && <a href={emailHref} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-sky-700 shadow-sm hover:bg-gray-50"><Mail className="h-4 w-4" /> Enviar por email</a>}
+          {lead.phone && <a href={whatsappHref} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-green-700 shadow-sm hover:bg-gray-50"><MessageCircle className="h-4 w-4" /> WhatsApp</a>}
+          <button onClick={() => downloadLeadIcs(lead, { start: new Date(plusDaysIso(1)), title: `SOL Demo — ${lead.companyName}`, durationMinutes: 30 })} className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-bold text-indigo-700 shadow-sm hover:bg-gray-50"><CalendarClock className="h-4 w-4" /> Adicionar ao calendario</button>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-ai-dark/98 backdrop-blur-md">
+    <div className="fixed inset-0 z-[60] flex flex-col bg-white">
       {/* topo */}
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-800 bg-ai-card px-6 py-3">
+      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-3 shadow-sm">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="rounded border border-cyan-500/30 bg-cyan-500/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300">MODO DEMO</span>
-          <h2 className="truncate text-base font-bold text-white">{lead.companyName}</h2>
+          <span className="rounded border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">DEMO COMERCIAL</span>
+          <h2 className="truncate text-base font-bold text-gray-900">{lead.companyName}</h2>
         </div>
         <div className="flex items-center gap-3">
           <div className="hidden items-center gap-1 md:flex">
-            <Users className="mr-1 h-3.5 w-3.5 text-gray-500" />
+            <Users className="mr-1 h-3.5 w-3.5 text-gray-400" />
             {personas.map((p) => (
-              <button key={p.key} onClick={() => setPersona(p.key)} className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${persona === p.key ? 'bg-emerald-600/15 text-emerald-300' : 'text-gray-500 hover:text-white'}`}>{p.label}</button>
+              <button key={p.key} onClick={() => setPersona(p.key)} className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${persona === p.key ? 'bg-emerald-100 text-emerald-700' : 'text-gray-400 hover:text-gray-700'}`}>{p.label}</button>
             ))}
           </div>
-          <button onClick={handleCopy} className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-[11px] font-bold text-gray-300 transition hover:bg-gray-700" title="Copiar pitch">
-            {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />} {copied ? 'Copiado' : 'Copiar pitch'}
+          <button onClick={handleCopy} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-[11px] font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />} {copied ? 'Copiado' : 'Copiar pitch'}
           </button>
-          <button onClick={onClose} className="flex items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-gray-700"><X className="h-4 w-4" /> Sair</button>
+          <button onClick={onClose} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50"><X className="h-4 w-4" /> Sair</button>
         </div>
       </header>
 
       {/* seletor de persona mobile */}
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-gray-800 bg-ai-card px-4 py-2 md:hidden">
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-gray-100 bg-gray-50 px-4 py-2 md:hidden">
         {personas.map((p) => (
-          <button key={p.key} onClick={() => setPersona(p.key)} className={`shrink-0 rounded-md px-2.5 py-1 text-[11px] font-bold transition ${persona === p.key ? 'bg-emerald-600/15 text-emerald-300' : 'text-gray-500'}`}>{p.label}</button>
+          <button key={p.key} onClick={() => setPersona(p.key)} className={`shrink-0 rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${persona === p.key ? 'bg-emerald-100 text-emerald-700' : 'text-gray-400'}`}>{p.label}</button>
         ))}
       </div>
 
       {/* slide */}
-      <main className="flex-1 overflow-y-auto p-8">
+      <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
         <div className="mx-auto h-full max-w-6xl">{renderSlide()}</div>
       </main>
 
       {/* rodape navegacao */}
-      <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-gray-800 bg-ai-card px-6 py-3">
-        <button onClick={() => go(-1)} disabled={clampedIndex === 0} className="flex items-center gap-1.5 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs font-bold text-gray-300 transition hover:bg-gray-700 disabled:opacity-40"><ArrowLeft className="h-4 w-4" /> Anterior</button>
+      <footer className="flex shrink-0 items-center justify-between gap-4 border-t border-gray-200 bg-white px-6 py-3 shadow-sm">
+        <button onClick={() => go(-1)} disabled={clampedIndex === 0} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50 disabled:opacity-40"><ArrowLeft className="h-4 w-4" /> Anterior</button>
         <div className="flex items-center gap-1.5">
           {Array.from({ length: totalSlides }).map((_, i) => (
-            <button key={i} onClick={() => setIndex(i)} className={`h-2 rounded-full transition-all ${i === clampedIndex ? 'w-6 bg-emerald-400' : 'w-2 bg-gray-700 hover:bg-gray-600'}`} />
+            <button key={i} onClick={() => setIndex(i)} className={`h-2 rounded-full transition-all ${i === clampedIndex ? 'w-6 bg-emerald-500' : 'w-2 bg-gray-300 hover:bg-gray-400'}`} />
           ))}
         </div>
-        <button onClick={() => go(1)} disabled={clampedIndex === totalSlides - 1} className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-emerald-500 disabled:opacity-40">Proximo <ArrowRight className="h-4 w-4" /></button>
+        <button onClick={() => go(1)} disabled={clampedIndex === totalSlides - 1} className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-40">Proximo <ArrowRight className="h-4 w-4" /></button>
       </footer>
     </div>
   );
