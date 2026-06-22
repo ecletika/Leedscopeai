@@ -432,6 +432,19 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [livePhone, setLivePhone] = useState(lead.phone || '');
   const [liveAdditionalPhones, setLiveAdditionalPhones] = useState<string[]>(lead.additionalPhones || []);
   const [liveWebsite, setLiveWebsite] = useState(lead.website || '');
+  // telefone escolhido para a chamada (quando ha mais do que um)
+  const [selectedPhone, setSelectedPhone] = useState(lead.phone || lead.additionalPhones?.[0] || '');
+
+  const allLivePhones = useMemo(
+    () => [livePhone, ...liveAdditionalPhones].filter(Boolean) as string[],
+    [livePhone, liveAdditionalPhones]
+  );
+
+  // mantem o telefone selecionado valido quando a lista muda (ex.: apos enriquecer)
+  useEffect(() => {
+    if (allLivePhones.length === 0) { setSelectedPhone(''); return; }
+    if (!allLivePhones.includes(selectedPhone)) setSelectedPhone(allLivePhones[0]);
+  }, [allLivePhones, selectedPhone]);
 
   const handleEnrich = async () => {
     setEnriching(true);
@@ -684,11 +697,25 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{lead.location}</span>
-                {livePhone && (
-                <span className="flex items-center gap-2">
-                  <a href={`tel:${livePhone}`} className="flex items-center gap-1 font-mono text-emerald-600 hover:underline"><Phone className="h-3 w-3" />{livePhone}</a>
+                {allLivePhones.length > 0 && (
+                <span key={selectedPhone} className="flex items-center gap-2">
+                  <Phone className="h-3 w-3 text-emerald-600" />
+                  {allLivePhones.length > 1 ? (
+                    <select
+                      value={selectedPhone}
+                      onChange={(e) => setSelectedPhone(e.target.value)}
+                      className="rounded border border-gray-300 bg-white px-1.5 py-0.5 font-mono text-[11px] text-emerald-700 shadow-sm focus:border-emerald-500 focus:outline-none"
+                      title="Escolher telefone para ligar"
+                    >
+                      {allLivePhones.map((p, i) => (
+                        <option key={p} value={p}>{p}{i === 0 ? ' (principal)' : ''}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <a href={`tel:${selectedPhone}`} className="font-mono text-emerald-600 hover:underline">{selectedPhone}</a>
+                  )}
                   <TwilioCall
-                    phoneNumber={livePhone}
+                    phoneNumber={selectedPhone}
                     leadName={lead.companyName}
                     onCallEnded={(secs) => {
                       const mins = Math.floor(secs / 60);
@@ -699,12 +726,6 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                   />
                 </span>
               )}
-                {liveAdditionalPhones.map((p) => (
-                  <span key={p} className="flex items-center gap-2">
-                    <a href={`tel:${p}`} className="flex items-center gap-1 font-mono text-emerald-600 hover:underline" title="Telefone adicional"><Phone className="h-3 w-3" />{p}</a>
-                    <TwilioCall phoneNumber={p} leadName={lead.companyName} />
-                  </span>
-                ))}
                 {lead.email && <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-gray-600 hover:underline"><Mail className="h-3 w-3" />{lead.email}</a>}
                 {liveWebsite && <a href={liveWebsite} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-600 hover:underline"><Globe className="h-3 w-3" />{liveWebsite.replace(/^https?:\/\//, '').split('/')[0]}</a>}
                 <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" />{sellerName}</span>
