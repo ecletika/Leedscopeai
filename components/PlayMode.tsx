@@ -41,6 +41,7 @@ import {
 } from '../types';
 import { crmDb } from '../services/crmDb';
 import { hotelDb } from '../services/hotelDb';
+import { destroyTwilioDevice } from '../services/twilioService';
 import { analyzeCallNotes } from '../services/geminiService';
 import { computeLeadScore } from '../services/leadScoring';
 
@@ -521,6 +522,11 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id]);
+
+  // Destroi o device Twilio uma unica vez, ao fechar o Play (nao por cada botao de telefone)
+  useEffect(() => {
+    return () => { destroyTwilioDevice(); };
+  }, []);
 
   const handleAddContact = async () => {
     if (!newContactName.trim() && !newContactPhone.trim()) return;

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
-import { destroyTwilioDevice, getTwilioDevice } from '../services/twilioService';
+import { getTwilioDevice } from '../services/twilioService';
 import type { Call } from '../services/twilioService';
 
 type CallState = 'idle' | 'initializing' | 'dialing' | 'connected' | 'ended' | 'error';
@@ -22,10 +22,12 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
   const durationRef = useRef(0);
 
   useEffect(() => {
+    // Ao desmontar so encerra a chamada DESTE componente.
+    // O device Twilio e partilhado (singleton) entre varios botoes de telefone,
+    // por isso nao pode ser destruido aqui — isso terminava chamadas de outros numeros.
     return () => {
       clearTimer();
       callRef.current?.disconnect();
-      destroyTwilioDevice();
     };
   }, []);
 
