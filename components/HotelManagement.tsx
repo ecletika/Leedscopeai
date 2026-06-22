@@ -813,6 +813,16 @@ export default function HotelManagement({ onSelectProposal, onSelectChat, onOpen
                       {sellers.map((seller) => <option key={seller.id} value={seller.id}>{seller.name}</option>)}
                     </select>
                   </Field>
+                  <Field label="Valor mensal do contrato (€)">
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={currentHotel.dealValue ?? ''}
+                      onChange={(e) => setCurrentHotel({ ...currentHotel, dealValue: e.target.value ? Number(e.target.value) : undefined })}
+                      className={`${fieldInputClass} font-mono`}
+                      placeholder="ex.: 149"
+                    />
+                    <span className="mt-1 block text-[9px] text-gray-500">Comissao do vendedor = 30%/mes enquanto for cliente</span>
+                  </Field>
                   <Field label="Tipo da proxima acao">
                     <select value={currentHotel.nextActionType || 'call'} onChange={(e) => setCurrentHotel({ ...currentHotel, nextActionType: e.target.value as NextActionType })} className={fieldInputClass}>
                       {nextActionOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}

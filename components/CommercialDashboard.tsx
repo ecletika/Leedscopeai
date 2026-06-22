@@ -1,11 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  BadgePercent,
   BarChart3,
+  CheckCircle,
+  FileText,
   Loader2,
   RefreshCw,
   TrendingDown,
   TrendingUp,
-  Users
+  Users,
+  Wallet
 } from 'lucide-react';
 import { CommercialLeadStatus, CrmSeller, Lead } from '../types';
 import { crmDb } from '../services/crmDb';
@@ -24,6 +28,9 @@ const FUNNEL: { label: string; match: (lead: Lead) => boolean; tone: string }[] 
 interface CommercialDashboardProps {
   restrictSellerId?: string;
 }
+
+const COMMISSION_RATE = 0.30; // 30% recorrente, enquanto o cliente pagar
+const eur = (v: number) => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 
 export default function CommercialDashboard({ restrictSellerId }: CommercialDashboardProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -78,6 +85,33 @@ export default function CommercialDashboard({ restrictSellerId }: CommercialDash
     });
   }, [sellers, leads]);
 
+  // Comissoes por vendedor: contrato = lead com valor mensal; finalizado = ganho (won).
+  // Comissao = 30% do valor mensal, recorrente enquanto o cliente pagar.
+  const commissions = useMemo(() => {
+    return sellers.map((seller) => {
+      const own = leads.filter((l) => l.responsibleSellerId === seller.id);
+      const contracts = own.filter((l) => (l.dealValue ?? 0) > 0);
+      const finalized = contracts.filter((l) => l.commercialStatus === 'won');
+      const mrrActive = finalized.reduce((sum, l) => sum + (l.dealValue || 0), 0); // valor mensal recorrente (clientes a pagar)
+      const mrrPipeline = contracts.reduce((sum, l) => sum + (l.dealValue || 0), 0); // total incl. pendentes
+      const commissionMonthly = mrrActive * COMMISSION_RATE;
+      return {
+        seller,
+        totalContracts: contracts.length,
+        finalizedContracts: finalized.length,
+        mrrActive,
+        mrrPipeline,
+        commissionMonthly,
+        commissionYearly: commissionMonthly * 12
+      };
+    }).sort((a, b) => b.commissionMonthly - a.commissionMonthly);
+  }, [sellers, leads]);
+
+  const totalCommissionMonthly = useMemo(
+    () => commissions.reduce((s, c) => s + c.commissionMonthly, 0),
+    [commissions]
+  );
+
   if (loading) {
     return (
       <div className="rounded-lg border border-gray-800 bg-ai-card p-16 text-center">
@@ -104,6 +138,65 @@ export default function CommercialDashboard({ restrictSellerId }: CommercialDash
             <div className={`mt-2 text-xl font-bold ${m.tone}`}>{m.value}</div>
           </div>
         ))}
+      </div>
+
+      {/* Comissoes por vendedor — cards */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400">
+            <BadgePercent className="h-3.5 w-3.5 text-emerald-400" /> Contratos e comissoes por vendedor
+          </h3>
+          {!restrictSellerId && (
+            <span className="text-[11px] text-gray-500">
+              Comissao mensal total da equipa: <span className="font-bold text-emerald-300">{eur(totalCommissionMonthly)}</span>
+            </span>
+          )}
+        </div>
+
+        {commissions.length === 0 ? (
+          <div className="rounded-lg border border-gray-800 bg-ai-card p-8 text-center text-xs text-gray-500">Sem vendedores registados.</div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {commissions.map((c) => (
+              <div key={c.seller.id} className="rounded-xl border border-gray-800 bg-ai-card p-5 transition hover:border-emerald-500/30">
+                {/* Cabecalho do card */}
+                <div className="flex items-center gap-3 border-b border-gray-800 pb-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-sm font-bold text-emerald-300">
+                    {c.seller.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-bold text-white">{c.seller.name}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-gray-500">Vendedor</div>
+                  </div>
+                </div>
+
+                {/* Metricas */}
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-ai-dark p-3">
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-500"><FileText className="h-3 w-3" /> Contratos</div>
+                    <div className="mt-1 text-xl font-bold text-white">{c.totalContracts}</div>
+                  </div>
+                  <div className="rounded-lg bg-ai-dark p-3">
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-500"><CheckCircle className="h-3 w-3" /> Finalizados</div>
+                    <div className="mt-1 text-xl font-bold text-green-300">{c.finalizedContracts}</div>
+                  </div>
+                  <div className="rounded-lg bg-ai-dark p-3">
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-gray-500"><Wallet className="h-3 w-3" /> Valor mensal</div>
+                    <div className="mt-1 text-lg font-bold text-white">{eur(c.mrrActive)}</div>
+                    {c.mrrPipeline > c.mrrActive && (
+                      <div className="text-[9px] text-gray-500">+{eur(c.mrrPipeline - c.mrrActive)} pendente</div>
+                    )}
+                  </div>
+                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-3">
+                    <div className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400"><BadgePercent className="h-3 w-3" /> Comissao 30%</div>
+                    <div className="mt-1 text-lg font-bold text-emerald-300">{eur(c.commissionMonthly)}</div>
+                    <div className="text-[9px] text-emerald-400/70">/mes · {eur(c.commissionYearly)}/ano</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Funil */}

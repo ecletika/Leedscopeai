@@ -219,6 +219,7 @@ export interface Lead {
   allPhones: string[];
   contactPerson?: string; // Pessoa de contacto (Ex: Governanta Geral, Gerente)
   contactNotes?: string;  // Notas do que foi falado/combinado
+  dealValue?: number;     // Valor mensal do contrato (€/mês) — base da comissao do vendedor
   callbackScheduledAt?: string; // Data e hora agendadas para ligar novamente
   callbackStatus?: 'pending' | 'completed' | 'canceled';
   
