@@ -451,10 +451,16 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   };
 
   const handleApplyEnrich = async (field: 'phone' | 'website', value: string) => {
-    await hotelDb.patchHotelFields(lead.id, { [field]: value });
+    const ok = await hotelDb.patchHotelFields(lead.id, lead.companyName, { [field]: value });
+    if (!ok) {
+      alert('Nao foi possivel guardar na base de dados. Tente novamente.');
+      return;
+    }
     if (field === 'phone') { setDecisionPhone(value); setLivePhone(value); }
     if (field === 'website') setLiveWebsite(value);
     setEnrichSaved((prev) => [...prev, field]);
+    // refresca a lista principal (HotelManagement) para refletir o novo dado
+    onSaved();
   };
 
   // Novo contacto

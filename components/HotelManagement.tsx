@@ -51,6 +51,7 @@ interface HotelManagementProps {
   onOpenQualify?: (hotel: Lead) => void;
   onOpenProposalBuilder?: (hotel: Lead) => void;
   restrictSellerId?: string;
+  refreshToken?: number;
 }
 
 const statusOptions: { value: CommercialLeadStatus; label: string; tone: string }[] = [
@@ -134,7 +135,7 @@ const buildDefaultLead = (): Partial<Lead> => ({
   doNotContact: false
 });
 
-export default function HotelManagement({ onSelectProposal, onSelectChat, onOpenPlay, onOpenDemo, onOpenMessages, onOpenQualify, onOpenProposalBuilder, restrictSellerId }: HotelManagementProps) {
+export default function HotelManagement({ onSelectProposal, onSelectChat, onOpenPlay, onOpenDemo, onOpenMessages, onOpenQualify, onOpenProposalBuilder, restrictSellerId, refreshToken }: HotelManagementProps) {
   const [hotels, setHotels] = useState<Lead[]>([]);
   const [sellers, setSellers] = useState<CrmSeller[]>([]);
   const [closeReasons, setCloseReasons] = useState<CrmCloseReason[]>([]);
@@ -172,7 +173,8 @@ export default function HotelManagement({ onSelectProposal, onSelectChat, onOpen
 
   useEffect(() => {
     fetchData();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshToken]);
 
   const sellerNameById = useMemo(() => {
     return sellers.reduce<Record<string, string>>((acc, seller) => {

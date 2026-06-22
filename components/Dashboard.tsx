@@ -74,6 +74,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
   // CRM Play mode overlay
   const [activeLeadForPlay, setActiveLeadForPlay] = useState<Lead | null>(null);
+  // sinal de refresh para a tabela de leads (HotelManagement carrega a sua propria lista)
+  const [hotelRefreshToken, setHotelRefreshToken] = useState(0);
   const [activeLeadForDemo, setActiveLeadForDemo] = useState<Lead | null>(null);
   const [activeLeadForMessages, setActiveLeadForMessages] = useState<Lead | null>(null);
   // email tab — managed via activeTab === 'email'
@@ -185,6 +187,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   const handlePlaySaved = async () => {
     await loadSavedHotels();
     await loadCrmMeta();
+    setHotelRefreshToken((t) => t + 1);
   };
 
   // Save Lead from active search results campaign directly into the B2B CRM database
@@ -921,6 +924,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                         onOpenQualify={handleOpenQualify}
                         onOpenProposalBuilder={handleOpenProposalBuilder}
                         restrictSellerId={restrictSellerId}
+                        refreshToken={hotelRefreshToken}
                     />
                 </div>
             )}
@@ -1525,7 +1529,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 lead={activeLeadForPlay}
                 sellers={crmSellers}
                 closeReasons={crmCloseReasons}
-                onClose={() => setActiveLeadForPlay(null)}
+                onClose={() => { setActiveLeadForPlay(null); setHotelRefreshToken((t) => t + 1); }}
                 onSaved={handlePlaySaved}
                 onOpenDemo={() => setActiveLeadForDemo(activeLeadForPlay)}
                 onOpenMessages={() => setActiveLeadForMessages(activeLeadForPlay)}

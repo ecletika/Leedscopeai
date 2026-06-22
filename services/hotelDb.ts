@@ -107,10 +107,16 @@ export const hotelDb = {
   },
 
   /**
-   * Targeted patch — only updates the given columns by row ID.
-   * Used for enrichment (phone/website) to avoid CRM-column failures in saveHotel.
+   * Targeted patch — only updates the given columns (phone/website) for one row.
+   * Matches by row ID, falling back to company_name. Returns true only if a row
+   * was actually written in Supabase. Avoids the CRM-column failures of saveHotel
+   * that silently fell back to localStorage.
    */
-  async patchHotelFields(id: string, fields: { phone?: string; website?: string }): Promise<boolean> {
+  async patchHotelFields(
+    id: string,
+    companyName: string,
+    fields: { phone?: string; website?: string }
+  ): Promise<boolean> {
     const patch: Record<string, string | null> = {};
     if ('phone' in fields) patch.phone = fields.phone ?? null;
     if ('website' in fields) patch.website = fields.website ?? null;
@@ -118,21 +124,42 @@ export const hotelDb = {
 
     if (isSupabaseConfigured()) {
       try {
-        const { error } = await supabase
+        // 1) tentar por id
+        const byId = await supabase
           .from('hotels')
           .update(patch)
-          .eq('id', id);
-        if (!error) return true;
-        console.error('patchHotelFields Supabase error:', error);
+          .eq('id', id)
+          .select('id');
+        if (byId.error) {
+          console.error('patchHotelFields error (by id):', byId.error);
+        } else if (byId.data && byId.data.length > 0) {
+          return true;
+        }
+
+        // 2) fallback por company_name (caso o id local nao bata com o da BD)
+        const byName = await supabase
+          .from('hotels')
+          .update(patch)
+          .eq('company_name', companyName)
+          .select('id');
+        if (byName.error) {
+          console.error('patchHotelFields error (by name):', byName.error);
+        } else if (byName.data && byName.data.length > 0) {
+          return true;
+        }
+
+        console.warn('patchHotelFields: nenhuma linha correspondente na BD para', { id, companyName });
+        return false;
       } catch (err) {
         console.error('patchHotelFields failed:', err);
+        return false;
       }
     }
 
-    // Fallback: localStorage
+    // Sem Supabase configurado: localStorage
     const stored = localStorage.getItem(LS_HOTELS_KEY);
     const hotels: Lead[] = stored ? JSON.parse(stored) : [];
-    const idx = hotels.findIndex((h) => h.id === id);
+    const idx = hotels.findIndex((h) => h.id === id || h.companyName === companyName);
     if (idx >= 0) {
       if ('phone' in fields) hotels[idx].phone = fields.phone;
       if ('website' in fields) hotels[idx].website = fields.website;
