@@ -76,6 +76,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   const [activeLeadForPlay, setActiveLeadForPlay] = useState<Lead | null>(null);
   // sinal de refresh para a tabela de leads (HotelManagement carrega a sua propria lista)
   const [hotelRefreshToken, setHotelRefreshToken] = useState(0);
+  // contador de buscas Google Places (creditos: comeca em limit e desce ate 0)
+  const [placesUsage, setPlacesUsage] = useState<{ used: number; limit: number; warnAt: number } | null>(null);
   const [activeLeadForDemo, setActiveLeadForDemo] = useState<Lead | null>(null);
   const [activeLeadForMessages, setActiveLeadForMessages] = useState<Lead | null>(null);
   // email tab — managed via activeTab === 'email'
@@ -183,6 +185,18 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   const handleOpenProposalBuilder = (lead: Lead) => {
     setActiveLeadForProposalBuilder(lead);
   };
+
+  const loadPlacesUsage = async () => {
+    try {
+      const r = await fetch('/api/places/usage');
+      if (r.ok) setPlacesUsage(await r.json());
+    } catch { /* ignore */ }
+  };
+
+  useEffect(() => {
+    if (currentUser.role === 'admin') loadPlacesUsage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser.role, hotelRefreshToken]);
 
   const handlePlaySaved = async () => {
     await loadSavedHotels();
@@ -755,11 +769,22 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             </h1>
             <div className="flex items-center gap-4 text-sm">
                 <ThemeToggle />
-                <div className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-full flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-emerald-400" />
-                    <span className="font-bold text-white">{currentUser.credits}</span>
-                    <span className="text-gray-400 text-xs">créditos</span>
-                </div>
+                {currentUser.role === 'admin' && placesUsage ? (
+                    <div
+                        className={`px-3 py-1 rounded-full flex items-center gap-2 border ${placesUsage.used >= placesUsage.warnAt ? 'bg-rose-500/10 border-rose-500/40' : 'bg-gray-800 border-gray-700'}`}
+                        title={`Buscas Google usadas: ${placesUsage.used} de ${placesUsage.limit} este mês`}
+                    >
+                        <CreditCard className={`w-4 h-4 ${placesUsage.used >= placesUsage.warnAt ? 'text-rose-400' : 'text-emerald-400'}`} />
+                        <span className={`font-bold ${placesUsage.used >= placesUsage.warnAt ? 'text-rose-300' : 'text-white'}`}>{Math.max(placesUsage.limit - placesUsage.used, 0)}</span>
+                        <span className="text-gray-400 text-xs">créditos Google</span>
+                    </div>
+                ) : (
+                    <div className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-full flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-emerald-400" />
+                        <span className="font-bold text-white">{currentUser.credits}</span>
+                        <span className="text-gray-400 text-xs">créditos</span>
+                    </div>
+                )}
                 <div className="flex items-center gap-2 text-gray-400 text-xs font-mono">
                     <UserIcon className="w-3.5 h-3.5 text-emerald-500" /> {currentUser.name} ({currentUser.role})
                 </div>
