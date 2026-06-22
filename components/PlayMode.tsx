@@ -435,16 +435,30 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   // telefone escolhido para a chamada (quando ha mais do que um)
   const [selectedPhone, setSelectedPhone] = useState(lead.phone || lead.additionalPhones?.[0] || '');
 
-  const allLivePhones = useMemo(
-    () => [livePhone, ...liveAdditionalPhones].filter(Boolean) as string[],
-    [livePhone, liveAdditionalPhones]
-  );
+  // Todos os numeros que se podem ligar: telefone do hotel + extras + telefones dos contactos
+  const callablePhones = useMemo(() => {
+    const norm = (p: string) => p.replace(/\s+/g, '');
+    const seen = new Set<string>();
+    const out: { phone: string; label: string }[] = [];
+    const add = (phone: string | undefined, label: string) => {
+      const v = (phone || '').trim();
+      if (!v) return;
+      const k = norm(v);
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push({ phone: v, label });
+    };
+    add(livePhone, 'Hotel (principal)');
+    liveAdditionalPhones.forEach((p, i) => add(p, `Hotel (extra ${i + 1})`));
+    contacts.forEach((c) => add(c.phone, c.name || contactTypeOptions.find((o) => o.value === c.contactType)?.label || 'Contacto'));
+    return out;
+  }, [livePhone, liveAdditionalPhones, contacts]);
 
   // mantem o telefone selecionado valido quando a lista muda (ex.: apos enriquecer)
   useEffect(() => {
-    if (allLivePhones.length === 0) { setSelectedPhone(''); return; }
-    if (!allLivePhones.includes(selectedPhone)) setSelectedPhone(allLivePhones[0]);
-  }, [allLivePhones, selectedPhone]);
+    if (callablePhones.length === 0) { setSelectedPhone(''); return; }
+    if (!callablePhones.some((c) => c.phone === selectedPhone)) setSelectedPhone(callablePhones[0].phone);
+  }, [callablePhones, selectedPhone]);
 
   const handleEnrich = async () => {
     setEnriching(true);
@@ -697,18 +711,18 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{lead.location}</span>
-                {allLivePhones.length > 0 && (
+                {callablePhones.length > 0 && (
                 <span key={selectedPhone} className="flex items-center gap-2">
                   <Phone className="h-3 w-3 text-emerald-600" />
-                  {allLivePhones.length > 1 ? (
+                  {callablePhones.length > 1 ? (
                     <select
                       value={selectedPhone}
                       onChange={(e) => setSelectedPhone(e.target.value)}
                       className="rounded border border-gray-300 bg-white px-1.5 py-0.5 font-mono text-[11px] text-emerald-700 shadow-sm focus:border-emerald-500 focus:outline-none"
                       title="Escolher telefone para ligar"
                     >
-                      {allLivePhones.map((p, i) => (
-                        <option key={p} value={p}>{p}{i === 0 ? ' (principal)' : ''}</option>
+                      {callablePhones.map((c) => (
+                        <option key={c.phone} value={c.phone}>{c.label}: {c.phone}</option>
                       ))}
                     </select>
                   ) : (

@@ -1947,11 +1947,14 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   });
 
   // ── TWILIO VOICE ────────────────────────────────────────────────────────────
-  const twilioSid     = process.env.TWILIO_ACCOUNT_SID;
-  const twilioKey     = process.env.TWILIO_API_KEY_SID;
-  const twilioSecret  = process.env.TWILIO_API_KEY_SECRET;
-  const twilioApp     = process.env.TWILIO_TWIML_APP_SID;
-  const twilioPhone   = process.env.TWILIO_PHONE_NUMBER;
+  // .trim() é essencial: valores colados nas env vars (Vercel) podem trazer
+  // espaços/tabs invisiveis. Um callerId com tab/espaco e invalido e a Twilio
+  // recusa a chamada de saida (a chamada liga e termina em segundos).
+  const twilioSid     = process.env.TWILIO_ACCOUNT_SID?.trim();
+  const twilioKey     = process.env.TWILIO_API_KEY_SID?.trim();
+  const twilioSecret  = process.env.TWILIO_API_KEY_SECRET?.trim();
+  const twilioApp     = process.env.TWILIO_TWIML_APP_SID?.trim();
+  const twilioPhone   = process.env.TWILIO_PHONE_NUMBER?.trim();
   const twilioReady   = twilioSid && twilioKey && twilioSecret && twilioApp;
 
   // GET /api/twilio/token — Access Token para o browser SDK
@@ -1979,9 +1982,10 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       const tw = await import('twilio');
       const VoiceResponse = (tw as any).default?.twiml?.VoiceResponse ?? (tw as any).twiml?.VoiceResponse;
       const twiml = new VoiceResponse();
-      const to = req.body.To as string | undefined;
+      const to = (req.body.To as string | undefined)?.trim();
+      const callerId = (twilioPhone || '').trim();
       if (to) {
-        const dial = twiml.dial({ callerId: twilioPhone || '' });
+        const dial = twiml.dial({ callerId });
         dial.number(to);
       } else {
         twiml.say({ language: 'pt-PT' }, 'Numero de destino nao especificado.');
