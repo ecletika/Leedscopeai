@@ -605,6 +605,9 @@ export default function HotelManagement({ onSelectProposal, onSelectChat, onOpen
                   <Play className="h-3.5 w-3.5" />
                   Play
                 </button>
+                <button onClick={() => handleOpenEditModal(hotel)} className="rounded-lg border border-gray-700 bg-gray-800 p-2 text-emerald-300 transition hover:bg-gray-700" title="Editar dados do hotel">
+                  <Edit className="h-4 w-4" />
+                </button>
                 <button onClick={() => handleDelete(hotel.id, hotel.companyName)} className="rounded-lg border border-gray-700 bg-gray-800 p-2 text-rose-300 transition hover:bg-rose-600 hover:text-white" title="Excluir">
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -686,6 +689,9 @@ export default function HotelManagement({ onSelectProposal, onSelectChat, onOpen
                       <div className="flex items-center justify-center gap-1.5">
                         <button onClick={() => handleStartPlay(hotel)} className="rounded-lg bg-emerald-600 p-1.5 text-white transition hover:bg-emerald-500" title="Modo Play">
                           <Play className="h-3.5 w-3.5" />
+                        </button>
+                        <button onClick={() => handleOpenEditModal(hotel)} className="rounded-lg bg-gray-800 p-1.5 text-emerald-300 transition hover:bg-gray-700" title="Editar dados do hotel">
+                          <Edit className="h-3.5 w-3.5" />
                         </button>
                         <button onClick={() => handleDelete(hotel.id, hotel.companyName)} className="rounded-lg bg-gray-800 p-1.5 text-rose-300 transition hover:bg-rose-600 hover:text-white" title="Excluir">
                           <Trash2 className="h-3.5 w-3.5" />
