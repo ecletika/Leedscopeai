@@ -429,6 +429,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [enrichSaved, setEnrichSaved] = useState<string[]>([]);
   // Dados "ao vivo" que substituem o lead original depois de enriquecer
   const [livePhone, setLivePhone] = useState(lead.phone || '');
+  const [liveAdditionalPhones, setLiveAdditionalPhones] = useState<string[]>(lead.additionalPhones || []);
   const [liveWebsite, setLiveWebsite] = useState(lead.website || '');
 
   const handleEnrich = async () => {
@@ -451,15 +452,28 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   };
 
   const handleApplyEnrich = async (field: 'phone' | 'website', value: string) => {
-    const ok = await hotelDb.patchHotelFields(lead.id, lead.companyName, { [field]: value });
+    if (field === 'phone') {
+      // nao sobrescreve: adiciona como principal (se vazio) ou como telefone extra
+      const res = await hotelDb.addPhone(lead.id, lead.companyName, value);
+      if (!res.ok) {
+        alert('Nao foi possivel guardar o telefone na base de dados. Tente novamente.');
+        return;
+      }
+      if (res.position === 'primary') { setLivePhone(value); setDecisionPhone(value); }
+      else if (res.position === 'additional') { setLiveAdditionalPhones((prev) => [...prev, value]); }
+      // 'duplicate' = ja existia, nada a fazer
+      setEnrichSaved((prev) => [...prev, field]);
+      onSaved();
+      return;
+    }
+
+    const ok = await hotelDb.patchHotelFields(lead.id, lead.companyName, { website: value });
     if (!ok) {
       alert('Nao foi possivel guardar na base de dados. Tente novamente.');
       return;
     }
-    if (field === 'phone') { setDecisionPhone(value); setLivePhone(value); }
-    if (field === 'website') setLiveWebsite(value);
+    setLiveWebsite(value);
     setEnrichSaved((prev) => [...prev, field]);
-    // refresca a lista principal (HotelManagement) para refletir o novo dado
     onSaved();
   };
 
@@ -679,6 +693,12 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                   />
                 </span>
               )}
+                {liveAdditionalPhones.map((p) => (
+                  <span key={p} className="flex items-center gap-2">
+                    <a href={`tel:${p}`} className="flex items-center gap-1 font-mono text-emerald-600 hover:underline" title="Telefone adicional"><Phone className="h-3 w-3" />{p}</a>
+                    <TwilioCall phoneNumber={p} leadName={lead.companyName} />
+                  </span>
+                ))}
                 {lead.email && <a href={`mailto:${lead.email}`} className="flex items-center gap-1 text-gray-600 hover:underline"><Mail className="h-3 w-3" />{lead.email}</a>}
                 {liveWebsite && <a href={liveWebsite} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-emerald-600 hover:underline"><Globe className="h-3 w-3" />{liveWebsite.replace(/^https?:\/\//, '').split('/')[0]}</a>}
                 <span className="flex items-center gap-1"><UserIcon className="h-3 w-3" />{sellerName}</span>
@@ -757,7 +777,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                         onClick={() => handleApplyEnrich('phone', enrichResult.phone!)}
                         className="ml-1 rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100"
                       >
-                        Guardar na ficha
+                        {livePhone ? 'Adicionar 2.o telefone' : 'Guardar na ficha'}
                       </button>
                     )}
                   </span>

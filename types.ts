@@ -215,7 +215,8 @@ export interface Lead {
   website?: string;
   email?: string;
   phone?: string;
-  allPhones: string[]; 
+  additionalPhones?: string[]; // telefones extra (ex.: encontrados ao enriquecer), sem sobrescrever o principal
+  allPhones: string[];
   contactPerson?: string; // Pessoa de contacto (Ex: Governanta Geral, Gerente)
   contactNotes?: string;  // Notas do que foi falado/combinado
   callbackScheduledAt?: string; // Data e hora agendadas para ligar novamente

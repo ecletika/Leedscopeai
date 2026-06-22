@@ -169,6 +169,81 @@ export const hotelDb = {
   },
 
   /**
+   * Add a phone WITHOUT overwriting the existing one.
+   * - If the lead has no primary phone yet, the number becomes the primary.
+   * - Otherwise it is appended to additional_phones (deduped).
+   * Returns where it was stored, or 'duplicate' if already present.
+   */
+  async addPhone(
+    id: string,
+    companyName: string,
+    newPhone: string
+  ): Promise<{ ok: boolean; position: 'primary' | 'additional' | 'duplicate' }> {
+    const norm = (p: string) => (p || '').replace(/\s+/g, '').trim();
+    const target = norm(newPhone);
+    if (!target) return { ok: false, position: 'duplicate' };
+
+    if (isSupabaseConfigured()) {
+      try {
+        // ler estado atual (por id, com fallback por nome)
+        let { data: row } = await supabase
+          .from('hotels')
+          .select('id, phone, additional_phones')
+          .eq('id', id)
+          .maybeSingle();
+        if (!row) {
+          const byName = await supabase
+            .from('hotels')
+            .select('id, phone, additional_phones')
+            .eq('company_name', companyName)
+            .maybeSingle();
+          row = byName.data || null;
+        }
+        if (!row) {
+          console.warn('addPhone: lead nao encontrado na BD', { id, companyName });
+          return { ok: false, position: 'duplicate' };
+        }
+
+        const primary = norm(row.phone || '');
+        const extras: string[] = Array.isArray(row.additional_phones) ? row.additional_phones : [];
+        const extrasNorm = extras.map(norm);
+
+        if (target === primary || extrasNorm.includes(target)) {
+          return { ok: true, position: 'duplicate' };
+        }
+
+        if (!primary) {
+          const { error } = await supabase.from('hotels').update({ phone: newPhone }).eq('id', row.id);
+          if (error) { console.error('addPhone primary error:', error); return { ok: false, position: 'duplicate' }; }
+          return { ok: true, position: 'primary' };
+        }
+
+        const updatedExtras = [...extras, newPhone];
+        const { error } = await supabase.from('hotels').update({ additional_phones: updatedExtras }).eq('id', row.id);
+        if (error) { console.error('addPhone additional error:', error); return { ok: false, position: 'duplicate' }; }
+        return { ok: true, position: 'additional' };
+      } catch (err) {
+        console.error('addPhone failed:', err);
+        return { ok: false, position: 'duplicate' };
+      }
+    }
+
+    // localStorage fallback
+    const stored = localStorage.getItem(LS_HOTELS_KEY);
+    const hotels: Lead[] = stored ? JSON.parse(stored) : [];
+    const idx = hotels.findIndex((h) => h.id === id || h.companyName === companyName);
+    if (idx < 0) return { ok: false, position: 'duplicate' };
+    const h = hotels[idx];
+    const primary = norm(h.phone || '');
+    const extras = h.additionalPhones || [];
+    if (target === primary || extras.map(norm).includes(target)) return { ok: true, position: 'duplicate' };
+    if (!primary) { h.phone = newPhone; }
+    else { h.additionalPhones = [...extras, newPhone]; }
+    localStorage.setItem(LS_HOTELS_KEY, JSON.stringify(hotels));
+    return { ok: true, position: primary ? 'additional' : 'primary' };
+  },
+
+  /**
    * Delete hotel from database
    */
   async deleteHotel(id: string, companyName: string): Promise<boolean> {
@@ -243,6 +318,7 @@ export const hotelDb = {
       website: lead.website || null,
       email: lead.email || null,
       phone: lead.phone || null,
+      additional_phones: lead.additionalPhones || [],
       contact_person: lead.contactPerson || null,
       contact_notes: lead.contactNotes || null,
       callback_scheduled_at: lead.callbackScheduledAt || null,
@@ -313,7 +389,8 @@ export const hotelDb = {
       website: row.website || undefined,
       email: row.email || undefined,
       phone: row.phone || undefined,
-      allPhones: row.phone ? [row.phone] : [],
+      additionalPhones: Array.isArray(row.additional_phones) ? row.additional_phones : [],
+      allPhones: [row.phone, ...(Array.isArray(row.additional_phones) ? row.additional_phones : [])].filter(Boolean) as string[],
       socials: [],
       nif: '',
       cae: '',

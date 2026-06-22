@@ -669,6 +669,9 @@ export default function HotelManagement({ onSelectProposal, onSelectChat, onOpen
                           <span className="max-w-[180px] truncate">{hotel.contactPerson || 'Por identificar'}</span>
                         </div>
                         {hotel.phone && <div className="flex items-center gap-1 font-mono text-[11px] text-emerald-300"><Phone className="h-3 w-3 text-gray-500" />{hotel.phone}</div>}
+                        {(hotel.additionalPhones || []).map((p) => (
+                          <div key={p} className="flex items-center gap-1 font-mono text-[11px] text-emerald-200/80"><Phone className="h-3 w-3 text-gray-600" />{p}</div>
+                        ))}
                         {hotel.email && <div className="flex items-center gap-1 text-[11px] text-gray-400"><Mail className="h-3 w-3 text-gray-500" /><span className="max-w-[180px] truncate">{hotel.email}</span></div>}
                       </div>
                     </td>
