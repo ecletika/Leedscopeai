@@ -451,8 +451,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   };
 
   const handleApplyEnrich = async (field: 'phone' | 'website', value: string) => {
-    const updated = { ...lead, [field]: value, lastActivityAt: new Date().toISOString() };
-    await hotelDb.saveHotel(updated);
+    await hotelDb.patchHotelFields(lead.id, { [field]: value });
     if (field === 'phone') { setDecisionPhone(value); setLivePhone(value); }
     if (field === 'website') setLiveWebsite(value);
     setEnrichSaved((prev) => [...prev, field]);

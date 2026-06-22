@@ -107,6 +107,41 @@ export const hotelDb = {
   },
 
   /**
+   * Targeted patch — only updates the given columns by row ID.
+   * Used for enrichment (phone/website) to avoid CRM-column failures in saveHotel.
+   */
+  async patchHotelFields(id: string, fields: { phone?: string; website?: string }): Promise<boolean> {
+    const patch: Record<string, string | null> = {};
+    if ('phone' in fields) patch.phone = fields.phone ?? null;
+    if ('website' in fields) patch.website = fields.website ?? null;
+    if (Object.keys(patch).length === 0) return true;
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase
+          .from('hotels')
+          .update(patch)
+          .eq('id', id);
+        if (!error) return true;
+        console.error('patchHotelFields Supabase error:', error);
+      } catch (err) {
+        console.error('patchHotelFields failed:', err);
+      }
+    }
+
+    // Fallback: localStorage
+    const stored = localStorage.getItem(LS_HOTELS_KEY);
+    const hotels: Lead[] = stored ? JSON.parse(stored) : [];
+    const idx = hotels.findIndex((h) => h.id === id);
+    if (idx >= 0) {
+      if ('phone' in fields) hotels[idx].phone = fields.phone;
+      if ('website' in fields) hotels[idx].website = fields.website;
+      localStorage.setItem(LS_HOTELS_KEY, JSON.stringify(hotels));
+    }
+    return true;
+  },
+
+  /**
    * Delete hotel from database
    */
   async deleteHotel(id: string, companyName: string): Promise<boolean> {
