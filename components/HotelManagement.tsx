@@ -41,6 +41,7 @@ import {
 import { crmDb } from '../services/crmDb';
 import { hotelDb } from '../services/hotelDb';
 import { computeLeadScore, bandForScore, computeInterestScore } from '../services/leadScoring';
+import LeadDiscovery from './LeadDiscovery';
 
 interface HotelManagementProps {
   onSelectProposal?: (hotel: Lead) => void;
@@ -52,6 +53,7 @@ interface HotelManagementProps {
   onOpenProposalBuilder?: (hotel: Lead) => void;
   restrictSellerId?: string;
   refreshToken?: number;
+  isAdmin?: boolean;
 }
 
 const statusOptions: { value: CommercialLeadStatus; label: string; tone: string }[] = [
@@ -135,7 +137,7 @@ const buildDefaultLead = (): Partial<Lead> => ({
   doNotContact: false
 });
 
-export default function HotelManagement({ onSelectProposal, onSelectChat, onOpenPlay, onOpenDemo, onOpenMessages, onOpenQualify, onOpenProposalBuilder, restrictSellerId, refreshToken }: HotelManagementProps) {
+export default function HotelManagement({ onSelectProposal, onSelectChat, onOpenPlay, onOpenDemo, onOpenMessages, onOpenQualify, onOpenProposalBuilder, restrictSellerId, refreshToken, isAdmin }: HotelManagementProps) {
   const [hotels, setHotels] = useState<Lead[]>([]);
   const [sellers, setSellers] = useState<CrmSeller[]>([]);
   const [closeReasons, setCloseReasons] = useState<CrmCloseReason[]>([]);
@@ -439,6 +441,8 @@ export default function HotelManagement({ onSelectProposal, onSelectChat, onOpen
           </button>
         </div>
       </div>
+
+      {isAdmin && <LeadDiscovery onSaved={fetchData} />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-8">
         {[

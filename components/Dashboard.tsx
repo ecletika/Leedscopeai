@@ -925,6 +925,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                         onOpenProposalBuilder={handleOpenProposalBuilder}
                         restrictSellerId={restrictSellerId}
                         refreshToken={hotelRefreshToken}
+                        isAdmin={currentUser.role === 'admin'}
                     />
                 </div>
             )}
@@ -1531,6 +1532,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 closeReasons={crmCloseReasons}
                 onClose={() => { setActiveLeadForPlay(null); setHotelRefreshToken((t) => t + 1); }}
                 onSaved={handlePlaySaved}
+                isAdmin={currentUser.role === 'admin'}
                 onOpenDemo={() => setActiveLeadForDemo(activeLeadForPlay)}
                 onOpenMessages={() => setActiveLeadForMessages(activeLeadForPlay)}
                 onOpenQualify={() => setActiveLeadForQualify(activeLeadForPlay)}

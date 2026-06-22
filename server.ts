@@ -2003,9 +2003,46 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     res.status(204).send();
   });
 
-  // ── GOOGLE PLACES — Enriquecimento de dados de hoteis ───────────────────────
+  // ── GOOGLE PLACES — Enriquecimento + busca de hoteis ────────────────────────
+  // Teto mensal (so avisa, nao bloqueia). Contador global partilhado na BD.
+  const PLACES_MONTHLY_LIMIT = 900;
+  const PLACES_WARN_AT = 800;
+  const placesPeriod = () => new Date().toISOString().slice(0, 7); // 'YYYY-MM'
+
+  // Le o nr de buscas Places deste mes
+  async function getPlacesUsage(): Promise<number> {
+    const admin = getSupabaseAdmin();
+    if (!admin) return 0;
+    const { data } = await admin
+      .from('api_usage')
+      .select('count')
+      .eq('period', placesPeriod())
+      .eq('service', 'places')
+      .maybeSingle();
+    return data?.count ?? 0;
+  }
+
+  // Incrementa o contador deste mes (upsert) e devolve o novo total
+  async function bumpPlacesUsage(): Promise<number> {
+    const admin = getSupabaseAdmin();
+    if (!admin) return 0;
+    const period = placesPeriod();
+    const current = await getPlacesUsage();
+    const next = current + 1;
+    await admin
+      .from('api_usage')
+      .upsert({ period, service: 'places', count: next, updated_at: new Date().toISOString() }, { onConflict: 'period,service' });
+    return next;
+  }
+
+  // GET /api/places/usage — estado do contador (para o painel do admin)
+  app.get('/api/places/usage', async (_req, res) => {
+    const used = await getPlacesUsage();
+    res.json({ used, limit: PLACES_MONTHLY_LIMIT, warnAt: PLACES_WARN_AT, period: placesPeriod() });
+  });
+
   app.post('/api/places/enrich', async (req, res) => {
-    const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
     if (!apiKey) return res.status(503).json({ error: 'GOOGLE_PLACES_API_KEY nao configurada no servidor.' });
 
     const { name, location } = req.body as { name?: string; location?: string };
@@ -2033,8 +2070,10 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       });
 
       const data: any = await response.json();
+      const used = await bumpPlacesUsage(); // conta a chamada (independente de ter resultados)
+
       if (!data.places || data.places.length === 0) {
-        return res.json({ found: false });
+        return res.json({ found: false, usage: { used, limit: PLACES_MONTHLY_LIMIT, warnAt: PLACES_WARN_AT } });
       }
 
       const place = data.places[0];
@@ -2045,10 +2084,60 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         website: place.websiteUri ?? null,
         address: place.formattedAddress ?? null,
         rating: place.rating ?? null,
-        totalRatings: place.userRatingCount ?? null
+        totalRatings: place.userRatingCount ?? null,
+        usage: { used, limit: PLACES_MONTHLY_LIMIT, warnAt: PLACES_WARN_AT }
       });
     } catch (err: any) {
       console.error('[Places] enrich error:', err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/places/search — descobre leads novos por zona/termo (1 chamada = ate 20 resultados)
+  app.post('/api/places/search', async (req, res) => {
+    const apiKey = process.env.GOOGLE_PLACES_API_KEY?.trim();
+    if (!apiKey) return res.status(503).json({ error: 'GOOGLE_PLACES_API_KEY nao configurada no servidor.' });
+
+    const { query, location } = req.body as { query?: string; location?: string };
+    const textQuery = [query, location].filter(Boolean).join(' ').trim();
+    if (!textQuery) return res.status(400).json({ error: 'Indique um termo ou zona para a busca.' });
+
+    try {
+      const response = await fetch('https://places.googleapis.com/v1/places:searchText', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': [
+            'places.id',
+            'places.displayName',
+            'places.formattedAddress',
+            'places.nationalPhoneNumber',
+            'places.internationalPhoneNumber',
+            'places.websiteUri',
+            'places.rating',
+            'places.userRatingCount'
+          ].join(',')
+        },
+        body: JSON.stringify({ textQuery, languageCode: 'pt' })
+      });
+
+      const data: any = await response.json();
+      const used = await bumpPlacesUsage();
+
+      const results = (data.places || []).map((p: any) => ({
+        placeId: p.id ?? null,
+        name: p.displayName?.text ?? null,
+        phone: p.internationalPhoneNumber ?? p.nationalPhoneNumber ?? null,
+        website: p.websiteUri ?? null,
+        address: p.formattedAddress ?? null,
+        rating: p.rating ?? null,
+        totalRatings: p.userRatingCount ?? null
+      }));
+
+      res.json({ results, usage: { used, limit: PLACES_MONTHLY_LIMIT, warnAt: PLACES_WARN_AT } });
+    } catch (err: any) {
+      console.error('[Places] search error:', err);
       res.status(500).json({ error: err.message });
     }
   });

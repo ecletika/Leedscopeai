@@ -51,6 +51,7 @@ interface PlayModeProps {
   closeReasons: CrmCloseReason[];
   onClose: () => void;
   onSaved: () => void;
+  isAdmin?: boolean;
   onOpenDemo?: () => void;
   onOpenMessages?: () => void;
   onOpenQualify?: () => void;
@@ -383,7 +384,7 @@ const plusDays = (days: number) => {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 };
 
-export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved, onOpenDemo, onOpenMessages, onOpenQualify, onOpenProposalBuilder, onSelectProposal, onSelectChat }: PlayModeProps) {
+export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved, isAdmin, onOpenDemo, onOpenMessages, onOpenQualify, onOpenProposalBuilder, onSelectProposal, onSelectChat }: PlayModeProps) {
   const seller = useMemo(
     () => sellers.find((s) => s.id === lead.responsibleSellerId),
     [sellers, lead.responsibleSellerId]
@@ -428,6 +429,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     address?: string; rating?: number; totalRatings?: number;
   } | null>(null);
   const [enrichSaved, setEnrichSaved] = useState<string[]>([]);
+  const [placesUsage, setPlacesUsage] = useState<{ used: number; limit: number; warnAt: number } | null>(null);
   // Dados "ao vivo" que substituem o lead original depois de enriquecer
   const [livePhone, setLivePhone] = useState(lead.phone || '');
   const [liveAdditionalPhones, setLiveAdditionalPhones] = useState<string[]>(lead.additionalPhones || []);
@@ -472,6 +474,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
       });
       const data = await res.json();
       setEnrichResult(data);
+      if (data.usage) setPlacesUsage(data.usage);
     } catch {
       setEnrichResult({ found: false });
     } finally {
@@ -781,16 +784,27 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                 <Bot className="h-3.5 w-3.5" />
               </button>
             )}
-            <div className="mx-1 h-5 w-px bg-gray-200" />
-            <button
-              onClick={handleEnrich}
-              disabled={enriching}
-              className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 disabled:opacity-50"
-              title="Pesquisar dados no Google Maps"
-            >
-              {enriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
-              Enriquecer
-            </button>
+            {isAdmin && (
+              <>
+                <div className="mx-1 h-5 w-px bg-gray-200" />
+                <div className="flex flex-col items-end">
+                  <button
+                    onClick={handleEnrich}
+                    disabled={enriching}
+                    className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 disabled:opacity-50"
+                    title="Pesquisar dados no Google Maps"
+                  >
+                    {enriching ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                    Enriquecer
+                  </button>
+                  {placesUsage && (
+                    <span className={`mt-0.5 text-[9px] font-bold ${placesUsage.used >= placesUsage.warnAt ? 'text-rose-600' : 'text-gray-400'}`}>
+                      {placesUsage.used}/{placesUsage.limit} buscas{placesUsage.used >= placesUsage.warnAt ? ' — perto do limite!' : ''}
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
             <button onClick={onClose} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
               <X className="h-4 w-4" /> Sair
             </button>
