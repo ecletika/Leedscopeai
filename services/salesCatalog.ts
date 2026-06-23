@@ -69,7 +69,7 @@ export const SALES_PLANS: SalesPlan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    idealFor: 'Ate 50 quartos e 50 areas comuns',
+    idealFor: 'Ate 30 quartos e 30 areas comuns',
     priceHint: '70,00 € / mes',
     setup: 'Setup + formacao da equipa',
     trial: '14 dias gratis',
@@ -79,7 +79,7 @@ export const SALES_PLANS: SalesPlan[] = [
   {
     id: 'premium',
     name: 'Premium',
-    idealFor: 'Acima de 50 quartos e +50 areas comuns',
+    idealFor: 'Acima de 30 quartos e +30 areas comuns',
     priceHint: '100,00 € / mes',
     setup: 'Onboarding dedicado',
     trial: 'Piloto acompanhado',
