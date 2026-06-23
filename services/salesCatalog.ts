@@ -60,8 +60,8 @@ export const SALES_PLANS: SalesPlan[] = [
   {
     id: 'starter',
     name: 'Starter',
-    idealFor: 'Hoteis pequenos (ate ~30 quartos)',
-    priceHint: 'Sob consulta (por quarto/mes)',
+    idealFor: 'Ate 10 quartos e 15 areas comuns',
+    priceHint: '50,00 € / mes',
     setup: 'Setup simples incluido',
     trial: '14 dias gratis',
     modules: ['Mapa de quartos', 'Tarefas de housekeeping', 'Checklists', 'App mobile', 'Multi-idioma']
@@ -69,8 +69,8 @@ export const SALES_PLANS: SalesPlan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    idealFor: 'Hoteis medios (30-150 quartos)',
-    priceHint: 'Sob consulta (por quarto/mes)',
+    idealFor: 'Ate 50 quartos e 50 areas comuns',
+    priceHint: 'Sob consulta',
     setup: 'Setup + formacao da equipa',
     trial: '14 dias gratis',
     modules: ['Tudo do Starter', 'Inspecoes de supervisao', 'Tickets de manutencao', 'Amenities e inventario', 'Relatorios', 'Dashboard em tempo real'],
@@ -79,8 +79,8 @@ export const SALES_PLANS: SalesPlan[] = [
   {
     id: 'premium',
     name: 'Premium',
-    idealFor: 'Grupos e varias unidades',
-    priceHint: 'Sob consulta (por unidade)',
+    idealFor: 'Acima de 50 quartos e +50 areas comuns',
+    priceHint: 'Sob consulta',
     setup: 'Onboarding dedicado',
     trial: 'Piloto acompanhado',
     modules: ['Tudo do Pro', 'Multi-propriedade', 'IA operacional', 'Integracao PMS', 'Sustentabilidade', 'Relatorios por grupo']
