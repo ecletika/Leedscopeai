@@ -70,7 +70,7 @@ export const SALES_PLANS: SalesPlan[] = [
     id: 'pro',
     name: 'Pro',
     idealFor: 'Ate 50 quartos e 50 areas comuns',
-    priceHint: 'Sob consulta',
+    priceHint: '70,00 € / mes',
     setup: 'Setup + formacao da equipa',
     trial: '14 dias gratis',
     modules: ['Tudo do Starter', 'Inspecoes de supervisao', 'Tickets de manutencao', 'Amenities e inventario', 'Relatorios', 'Dashboard em tempo real'],
@@ -80,7 +80,7 @@ export const SALES_PLANS: SalesPlan[] = [
     id: 'premium',
     name: 'Premium',
     idealFor: 'Acima de 50 quartos e +50 areas comuns',
-    priceHint: 'Sob consulta',
+    priceHint: '100,00 € / mes',
     setup: 'Onboarding dedicado',
     trial: 'Piloto acompanhado',
     modules: ['Tudo do Pro', 'Multi-propriedade', 'IA operacional', 'Integracao PMS', 'Sustentabilidade', 'Relatorios por grupo']
