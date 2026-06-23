@@ -9,6 +9,7 @@ import HotelManagement from './HotelManagement';
 import SellerManagement from './SellerManagement';
 import WeeklyPlanner from './WeeklyPlanner';
 import CommercialDashboard from './CommercialDashboard';
+import ContractGenerator from './ContractGenerator';
 import PipelineKanban from './PipelineKanban';
 import CommercialLibrary from './CommercialLibrary';
 import FollowUpCenter from './FollowUpCenter';
@@ -21,7 +22,7 @@ import SalesTools from './SalesTools';
 import ProposalBuilder from './ProposalBuilder';
 import ThemeToggle from './ThemeToggle';
 import Academy from './Academy';
-import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, CalendarClock, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, Users, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot, BarChart3, KanbanSquare, BookOpen, RotateCcw, Lightbulb, GraduationCap } from 'lucide-react';
+import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, CalendarClock, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, Users, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot, BarChart3, KanbanSquare, BookOpen, RotateCcw, Lightbulb, GraduationCap, FileSignature } from 'lucide-react';
 import { searchLeadsInLocation, analyzeAndGenerateProposal, generateOutreachEmail, runStorefrontInvestigation, generateCommercialProposal, askLeadQuestion, generateWebsiteCode, refineWebsiteCode } from '../services/geminiService';
 import { hotelDb } from '../services/hotelDb';
 import { crmDb } from '../services/crmDb';
@@ -70,7 +71,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'database' | 'pipeline' | 'planner' | 'followup' | 'tools' | 'academy' | 'agenda' | 'crm' | 'sellers' | 'library' | 'history' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'database' | 'pipeline' | 'planner' | 'followup' | 'tools' | 'academy' | 'agenda' | 'crm' | 'contracts' | 'sellers' | 'library' | 'history' | 'admin'>('dashboard');
 
   // CRM Play mode overlay
   const [activeLeadForPlay, setActiveLeadForPlay] = useState<Lead | null>(null);
@@ -707,6 +708,15 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
             {currentUser.role === 'admin' && (
                 <button
+                    onClick={() => setActiveTab('contracts')}
+                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'contracts' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+                >
+                    <FileSignature className="w-4 h-4" /> Contratos
+                </button>
+            )}
+
+            {currentUser.role === 'admin' && (
+                <button
                     onClick={() => setActiveTab('sellers')}
                     className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'sellers' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
                 >
@@ -762,6 +772,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 {activeTab === 'email' && 'Caixa de Email'}
                 {activeTab === 'agenda' && 'Agenda para Voltar Contactos (Callbacks)'}
                 {activeTab === 'crm' && 'Dashboard de Vendas'}
+                {activeTab === 'contracts' && 'Gerador de Contratos'}
                 {activeTab === 'sellers' && 'Equipa Comercial'}
                 {activeTab === 'library' && 'Scripts, Objeções e Materiais'}
                 {activeTab === 'history' && 'Histórico de Pesquisas'}
@@ -999,6 +1010,13 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             {activeTab === 'crm' && (
                 <div className="space-y-6 animate-in fade-in duration-300 text-left">
                     <CommercialDashboard restrictSellerId={restrictSellerId} />
+                </div>
+            )}
+
+            {/* --- GERADOR DE CONTRATOS --- */}
+            {activeTab === 'contracts' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <ContractGenerator isAdmin={currentUser.role === 'admin'} />
                 </div>
             )}
 
