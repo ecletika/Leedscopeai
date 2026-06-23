@@ -79,6 +79,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   const [hotelRefreshToken, setHotelRefreshToken] = useState(0);
   // contador de buscas Google Places (creditos: comeca em limit e desce ate 0)
   const [placesUsage, setPlacesUsage] = useState<{ used: number; limit: number; warnAt: number } | null>(null);
+  // lead pre-selecionado ao abrir o gerador de contratos
+  const [contractLeadId, setContractLeadId] = useState<string | null>(null);
   const [activeLeadForDemo, setActiveLeadForDemo] = useState<Lead | null>(null);
   const [activeLeadForMessages, setActiveLeadForMessages] = useState<Lead | null>(null);
   // email tab — managed via activeTab === 'email'
@@ -169,6 +171,12 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
   const handleOpenPlay = (lead: Lead) => {
     setActiveLeadForPlay(lead);
+  };
+
+  const handleOpenContract = (lead: Lead) => {
+    setContractLeadId(lead.id);
+    setActiveLeadForPlay(null);
+    setActiveTab('contracts');
   };
 
   const handleOpenDemo = (lead: Lead) => {
@@ -959,6 +967,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                         onOpenMessages={handleOpenMessages}
                         onOpenQualify={handleOpenQualify}
                         onOpenProposalBuilder={handleOpenProposalBuilder}
+                        onOpenContract={handleOpenContract}
                         restrictSellerId={restrictSellerId}
                         refreshToken={hotelRefreshToken}
                         isAdmin={currentUser.role === 'admin'}
@@ -1016,7 +1025,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             {/* --- GERADOR DE CONTRATOS --- */}
             {activeTab === 'contracts' && (
                 <div className="space-y-6 animate-in fade-in duration-300 text-left">
-                    <ContractGenerator isAdmin={currentUser.role === 'admin'} />
+                    <ContractGenerator isAdmin={currentUser.role === 'admin'} preselectLeadId={contractLeadId} />
                 </div>
             )}
 
@@ -1576,6 +1585,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 onClose={() => { setActiveLeadForPlay(null); setHotelRefreshToken((t) => t + 1); }}
                 onSaved={handlePlaySaved}
                 isAdmin={currentUser.role === 'admin'}
+                onOpenContract={() => activeLeadForPlay && handleOpenContract(activeLeadForPlay)}
                 onOpenDemo={() => setActiveLeadForDemo(activeLeadForPlay)}
                 onOpenMessages={() => setActiveLeadForMessages(activeLeadForPlay)}
                 onOpenQualify={() => setActiveLeadForQualify(activeLeadForPlay)}

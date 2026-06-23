@@ -164,9 +164,10 @@ function buildClauses(p: ProviderData, c: ClientData, t: Terms): Clause[] {
 
 interface ContractGeneratorProps {
   isAdmin?: boolean;
+  preselectLeadId?: string | null;
 }
 
-export default function ContractGenerator({ isAdmin }: ContractGeneratorProps) {
+export default function ContractGenerator({ isAdmin, preselectLeadId }: ContractGeneratorProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -190,6 +191,15 @@ export default function ContractGenerator({ isAdmin }: ContractGeneratorProps) {
   }, []);
 
   useEffect(() => { localStorage.setItem(PROVIDER_KEY, JSON.stringify(provider)); }, [provider]);
+
+  // pre-seleciona o cliente quando aberto a partir do Play Mode / ficha do lead
+  useEffect(() => {
+    if (preselectLeadId && leads.length) {
+      const l = leads.find((x) => x.id === preselectLeadId);
+      if (l && l.id !== selectedId) selectLead(l);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectLeadId, leads]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
