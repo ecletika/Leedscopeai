@@ -93,14 +93,7 @@ CREATE TABLE IF NOT EXISTS hotels (
     potential TEXT DEFAULT 'Medium' CHECK (potential IN ('Hot', 'Medium', 'Cold')),
     maps_rating NUMERIC(3,2),
     maps_reviews INTEGER
-);
-
--- Inserir utilizadores padrão
-INSERT INTO app_users (name, email, password, role, plan, credits, status)
-VALUES 
-('Administrador', 'admin@leadscope.ai', 'admin', 'admin', 'Agency', 9999, 'active'),
-('Usuário Demo', 'demo@leadscope.ai', 'demo', 'user', 'Pro', 150, 'active')
-ON CONFLICT (email) DO NOTHING;`;
+);`;
 
   const handleGoToLogin = () => {
     setView('login');
@@ -244,47 +237,6 @@ ON CONFLICT (email) DO NOTHING;`;
 
     const lowerEmail = loginEmail.toLowerCase().trim();
     
-    // --- DEMO / BYPASS USER FALLBACK ---
-    if (lowerEmail === 'admin@leadscope.ai' || lowerEmail === 'admin@lumilead.ai' || lowerEmail === 'admin@lumiad.com') {
-      if (loginPassword === 'admin' || loginPassword === 'admin123') {
-        const dummyAdmin: User = {
-          id: 'admin-fallback-id',
-          name: 'Administrador Demo',
-          email: lowerEmail,
-          role: 'admin',
-          plan: 'Agency',
-          credits: 9999,
-          status: 'active',
-          campaigns: []
-        };
-        setAllUsers([dummyAdmin]);
-        setCurrentUser(dummyAdmin);
-        setView('dashboard');
-        setIsLoading(false);
-        return;
-      }
-    }
-
-    if (lowerEmail === 'demo@leadscope.ai' || lowerEmail === 'demo@lumilead.ai' || lowerEmail === 'user@leadscope.ai') {
-      if (loginPassword === 'demo' || loginPassword === 'user123' || loginPassword === 'demo123') {
-        const dummyUser: User = {
-          id: 'demo-fallback-id',
-          name: 'Usuário Demo',
-          email: lowerEmail,
-          role: 'user',
-          plan: 'Pro',
-          credits: 150,
-          status: 'active',
-          campaigns: []
-        };
-        setAllUsers([dummyUser]);
-        setCurrentUser(dummyUser);
-        setView('dashboard');
-        setIsLoading(false);
-        return;
-      }
-    }
-
     try {
       // 1. Tentar Autenticação via Supabase Auth (Suporta utilizadores criados no painel do Supabase diretamente)
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -315,7 +267,7 @@ ON CONFLICT (email) DO NOTHING;`;
                                          legacyErrMsg.includes('table');
 
             if (isLegacyTableMissing) {
-              setLoginError('Tabelas não encontradas no seu banco de dados Supabase (ou o cache necessita de atualização). Utilize o modo Bypass (clicando nos botões abaixo) ou execute o script SQL abaixo no seu Painel Supabase!');
+              setLoginError('Tabelas não encontradas no seu banco de dados Supabase (ou o cache necessita de atualização). Execute o script SQL abaixo no seu Painel Supabase!');
               setShowSqlWizard(true);
             } else {
               setLoginError(`Erro do Supabase: ${legacyErr.message}`);
@@ -914,41 +866,6 @@ ON CONFLICT (email) DO NOTHING;`;
                 </div>
               )}
 
-              {/* Demo Section */}
-              <div className="pt-6 border-t border-gray-800">
-                <p className="text-center text-[10px] font-bold text-gray-500 mb-3 uppercase tracking-wider">Acesso de Demonstração (Modo Local/Bypass)</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('admin@leadscope.ai');
-                      setLoginPassword('admin');
-                      setAuthMode('login');
-                      setLoginError('');
-                      setShowSqlWizard(false);
-                    }}
-                    className="p-3 bg-gray-950/50 hover:bg-gray-850/40 border border-gray-800 hover:border-gray-750 rounded-xl text-center transition-all cursor-pointer group"
-                  >
-                    <span className="block text-xs font-bold text-emerald-400 group-hover:text-emerald-300">Admin Bypass</span>
-                    <span className="text-[10px] text-gray-500">Auto-preencher</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('demo@leadscope.ai');
-                      setLoginPassword('demo');
-                      setAuthMode('login');
-                      setLoginError('');
-                      setShowSqlWizard(false);
-                    }}
-                    className="p-3 bg-gray-950/50 hover:bg-gray-850/40 border border-gray-800 hover:border-gray-750 rounded-xl text-center transition-all cursor-pointer group"
-                  >
-                    <span className="block text-xs font-bold text-teal-400 group-hover:text-teal-300">Usuário Bypass</span>
-                    <span className="text-[10px] text-gray-500">Auto-preencher</span>
-                  </button>
-                </div>
-              </div>
-              
               <div className="text-center">
                 <button 
                   onClick={() => setView('landing')}

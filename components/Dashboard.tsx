@@ -618,8 +618,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
   return (
     <div className="flex h-screen bg-ai-dark text-white overflow-hidden font-sans">
-      <aside className="sol-sidebar w-64 border-r border-gray-800 hidden md:flex flex-col p-4 shrink-0">
-        <div className="flex items-center gap-2 mb-8 px-2">
+      <aside className="sol-sidebar w-64 h-screen min-h-0 border-r border-gray-800 hidden md:flex flex-col p-4 shrink-0">
+        <div className="flex items-center gap-2 mb-8 px-2 shrink-0">
             <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
               <Activity className="w-5 h-5 text-white" />
             </div>
@@ -628,7 +628,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
               <span className="text-[10px] text-emerald-400 font-mono tracking-wider font-bold">HOUSEKEEPING</span>
             </div>
         </div>
-        <nav className="space-y-1.5 flex-1">
+        <nav className="space-y-1.5 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 -mr-1">
             <button 
                 onClick={() => setActiveTab('dashboard')} 
                 className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'dashboard' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
@@ -757,12 +757,12 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 </button>
             )}
 
-            <button onClick={onLogout} className="w-full text-left px-4.5 py-2.5 text-gray-500 hover:text-rose-400 text-xs font-bold flex items-center gap-3 mt-12 border border-transparent">
+            <button onClick={onLogout} className="w-full text-left px-4.5 py-2.5 text-gray-500 hover:text-rose-400 text-xs font-bold flex items-center gap-3 mt-6 border border-transparent">
                 <LogOut className="w-4 h-4" /> Terminar Sessão
             </button>
         </nav>
 
-        <div className="mt-auto pt-4 border-t border-gray-800/50">
+        <div className="mt-auto pt-4 border-t border-gray-800/50 shrink-0">
             <SystemHealth compact={true} />
         </div>
       </aside>
