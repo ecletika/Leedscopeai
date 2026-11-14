@@ -42,6 +42,7 @@ import {
 } from '../types';
 import { crmDb } from '../services/crmDb';
 import { hotelDb } from '../services/hotelDb';
+import { getLeadPitch, buildWorkioScript, buildWorkioDemo, WORKIO_OBJECTIONS } from '../services/workioSales';
 import { destroyTwilioDevice } from '../services/twilioService';
 import { destroyEmetUA } from '../services/emetService';
 import { analyzeCallNotes } from '../services/geminiService';
@@ -405,7 +406,14 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     () => sellers.find((s) => s.id === lead.responsibleSellerId),
     [sellers, lead.responsibleSellerId]
   );
-  const sellerName = seller?.name || 'a equipa SOL';
+  // Hoteis vendem SOL; os restantes segmentos vendem Workio (guiao, demo e objecoes proprios)
+  const pitch = useMemo(() => getLeadPitch(lead.niche), [lead.niche]);
+  const isWorkio = pitch.kind === 'workio';
+  const workioSegment = pitch.kind === 'workio' ? pitch.segment : undefined;
+  const sellerName = seller?.name || (isWorkio ? 'a equipa Workio' : 'a equipa SOL');
+  const workioScript = useMemo(() => (isWorkio ? buildWorkioScript(workioSegment, sellerName) : null), [isWorkio, workioSegment, sellerName]);
+  const workioDemo = useMemo(() => (isWorkio ? buildWorkioDemo(workioSegment) : null), [isWorkio, workioSegment]);
+  const demoUrl: string | undefined = isWorkio ? ((import.meta as any).env?.VITE_WORKIO_DEMO_URL || undefined) : 'https://sol.ecletika.com';
 
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [activities, setActivities] = useState<CrmActivity[]>([]);
@@ -568,7 +576,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const materials: { title: string; benefit: string; url?: string }[] = dbMaterials.length
     ? dbMaterials.map((m) => ({ title: m.title, benefit: m.description || '', url: m.url }))
     : presentationCards.map((c) => ({ ...c, url: undefined }));
-  const objections = dbObjections.length
+  const objections = isWorkio
+    ? WORKIO_OBJECTIONS.map((o) => ({ objection: o.objection, response: o.response, full: o.full, question: o.question, material: o.material, next: o.next }))
+    : dbObjections.length
     ? dbObjections.map((o) => ({ objection: o.objection, response: o.suggestedResponse, full: o.fullResponse, question: o.followUpQuestion, material: o.recommendedMaterial, next: o.nextAction }))
     : objectionBank.map((o) => ({ objection: o.objection, response: o.response, full: undefined as string | undefined, question: undefined as string | undefined, material: undefined as string | undefined, next: undefined as string | undefined }));
   const selectedScript = dbScripts.find((s) => s.id === selectedScriptId);
@@ -1038,6 +1048,17 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-gray-800">
                 {selectedScript.content.replace(/\[NOME\]/g, sellerName)}
               </div>
+            ) : workioScript ? (
+              <div className="space-y-2 text-[13px] leading-relaxed text-gray-700">
+                {workioScript.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+                <p className="font-semibold text-emerald-700">{workioScript.closingQuestion}</p>
+                <div className="rounded-lg border border-emerald-200 bg-white p-2.5">
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">Perguntas de qualificação</div>
+                  <ul className="space-y-0.5 text-[12px] text-gray-600">
+                    {workioScript.qualification.map((q) => <li key={q}>• {q}</li>)}
+                  </ul>
+                </div>
+              </div>
             ) : (
               <div className="space-y-2 text-[13px] leading-relaxed text-gray-700">
                 <p>Ola, bom dia. O meu nome e <span className="font-bold text-gray-900">{sellerName}</span> e falo da <span className="font-bold text-emerald-700">SOL</span>.</p>
@@ -1167,7 +1188,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
                 <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Checklist antes de comecar</h3>
                 <ul className="space-y-1">
-                  {demoChecklist.map((item) => (
+                  {(workioDemo?.checklist ?? demoChecklist).map((item) => (
                     <li key={item} className="flex items-center gap-2 text-[11px] text-indigo-800">
                       <CheckCircle className="h-3 w-3 shrink-0 text-indigo-400" />{item}
                     </li>
@@ -1179,7 +1200,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Adaptar pelo perfil do cliente</h3>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {demoAdaptations.map((a) => (
+                  {(workioDemo?.adaptations ?? demoAdaptations).map((a) => (
                     <div key={a.role} className="rounded border border-gray-200 bg-white p-2">
                       <div className="text-[10px] font-bold text-gray-700">{a.role}</div>
                       <div className="mt-0.5 text-[10px] italic text-gray-500">{a.start}</div>
@@ -1190,7 +1211,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
               {/* Fases da demo — acordeao */}
               <div className="space-y-1.5">
-                {demoPhases.map((phase) => {
+                {(workioDemo?.phases ?? demoPhases).map((phase) => {
                   const isOpen = activeDemoStep === phase.id;
                   return (
                     <div key={phase.id} className={`overflow-hidden rounded-lg border transition ${isOpen ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
@@ -1208,7 +1229,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                           {phase.route && (
                             <span className="inline-block rounded border border-indigo-300 bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700">{phase.route}</span>
                           )}
-                          {demoImages[phase.id] && (
+                          {!isWorkio && demoImages[phase.id] && (
                             <img
                               src={demoImages[phase.id]}
                               alt={phase.title}
@@ -1261,7 +1282,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Modulos opcionais (se sobrar tempo)</h3>
                 <div className="flex flex-wrap gap-1">
-                  {demoOptionalModules.map((m) => (
+                  {(workioDemo?.optional ?? demoOptionalModules).map((m) => (
                     <span key={m} className="rounded border border-gray-300 bg-white px-2 py-0.5 font-mono text-[10px] text-gray-600">{m}</span>
                   ))}
                 </div>
@@ -1328,13 +1349,15 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               {b.label}
             </button>
           ))}
-          <button
-            onClick={() => window.open('https://sol.ecletika.com', '_blank')}
-            className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
-          >
-            <Monitor className="h-3.5 w-3.5" />
-            Abrir demo comercial
-          </button>
+          {demoUrl && (
+            <button
+              onClick={() => window.open(demoUrl, '_blank')}
+              className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+            >
+              <Monitor className="h-3.5 w-3.5" />
+              Abrir demo comercial
+            </button>
+          )}
           <div className="ml-auto flex items-center gap-3">
             <span className="text-[11px] text-gray-500">Estado final: <span className="font-bold text-gray-800">{statusButtons.find((b) => b.status === pendingStatus)?.label || pendingStatus}</span></span>
             <button
