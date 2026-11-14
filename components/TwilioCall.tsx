@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Mic, MicOff, Phone, PhoneOff } from 'lucide-react';
+import { Loader2, Mic, MicOff, Phone, PhoneOff, Settings, X } from 'lucide-react';
+import { isEmetActive, loadEmetConfig, saveEmetConfig, startEmetCall } from '../services/emetService';
+import type { EmetCall, EmetConfig } from '../services/emetService';
 import { getTwilioDevice } from '../services/twilioService';
 import type { Call } from '../services/twilioService';
 
@@ -17,7 +19,10 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState('');
 
-  const callRef = useRef<Call | null>(null);
+  const callRef = useRef<Call | EmetCall | null>(null);
+  const [showCfg, setShowCfg] = useState(false);
+  const [cfg, setCfg] = useState<EmetConfig>(() => loadEmetConfig());
+  const emet = isEmetActive(cfg);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const durationRef = useRef(0);
 
@@ -27,7 +32,7 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
     // por isso nao pode ser destruido aqui — isso terminava chamadas de outros numeros.
     return () => {
       clearTimer();
-      callRef.current?.disconnect();
+      hangUpCall();
     };
   }, []);
 
@@ -55,6 +60,23 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
     setError('');
     setDuration(0);
     durationRef.current = 0;
+
+    const finish = () => { setState('ended'); clearTimer(); onCallEnded?.(durationRef.current); };
+
+    if (emet) {
+      try {
+        setState('dialing');
+        callRef.current = await startEmetCall(phoneNumber, {
+          onAccepted: () => { setState('connected'); startTimer(); },
+          onEnded: finish,
+          onError: (msg) => { setState('error'); setError(msg); clearTimer(); },
+        });
+      } catch (err: any) {
+        setState('error');
+        setError(err.message || 'Nao foi possivel iniciar a chamada EMET');
+      }
+      return;
+    }
 
     try {
       const device = await getTwilioDevice();
@@ -85,9 +107,13 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
     }
   };
 
-  const handleHangUp = () => {
-    callRef.current?.disconnect();
+  const hangUpCall = () => {
+    const c: any = callRef.current;
+    if (!c) return;
+    if (typeof c.hangup === 'function') c.hangup(); else c.disconnect?.();
   };
+
+  const handleHangUp = () => hangUpCall();
 
   const toggleMute = () => {
     if (!callRef.current) return;
@@ -106,14 +132,56 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
 
   if (!phoneNumber) return null;
 
+  const field = (label: string, key: keyof EmetConfig, ph: string, type = 'text') => (
+    <label className="block text-[11px] font-bold text-gray-600">
+      {label}
+      <input
+        type={type}
+        value={(cfg[key] as string) || ''}
+        placeholder={ph}
+        onChange={(e) => setCfg({ ...cfg, [key]: e.target.value })}
+        className="mt-0.5 w-full rounded border border-gray-300 px-2 py-1 text-xs font-normal text-gray-800"
+      />
+    </label>
+  );
+
   return (
     <div className="flex items-center gap-2">
+      {state === 'idle' && (
+        <button onClick={() => setShowCfg(true)} title="Configurar extensão EMET" className="rounded-full p-1 text-gray-400 hover:text-emerald-600">
+          <Settings className="h-3.5 w-3.5" />
+        </button>
+      )}
+      {showCfg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShowCfg(false)}>
+          <div className="w-full max-w-sm space-y-3 rounded-xl bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-gray-800">Extensão EMET (SIP/WebRTC)</h3>
+              <button onClick={() => setShowCfg(false)}><X className="h-4 w-4 text-gray-500" /></button>
+            </div>
+            {field('Servidor WSS', 'wssUrl', 'wss://pbx.emet.pt:8089/ws')}
+            {field('Domínio SIP', 'domain', 'pbx.emet.pt')}
+            {field('Extensão', 'extension', '101')}
+            {field('Password da extensão', 'password', '••••••', 'password')}
+            <label className="flex items-center gap-2 text-xs font-bold text-gray-700">
+              <input type="checkbox" checked={cfg.enabled} onChange={(e) => setCfg({ ...cfg, enabled: e.target.checked })} />
+              Fazer as chamadas pelo EMET (em vez do Twilio)
+            </label>
+            <button
+              onClick={() => { saveEmetConfig(cfg); setShowCfg(false); }}
+              className="w-full rounded-lg bg-emerald-600 py-2 text-xs font-bold text-white hover:bg-emerald-500"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      )}
       {state === 'idle' && (
         <button
           onClick={handleCall}
           className="flex items-center gap-1.5 rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
         >
-          <Phone className="h-3 w-3" /> Ligar agora
+          <Phone className="h-3 w-3" /> {emet ? 'Ligar (EMET)' : 'Ligar agora'}
         </button>
       )}
 
