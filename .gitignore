@@ -25,3 +25,4 @@ dist-ssr
 
 # Plugin/agent local state
 .claude-flow/
+.swarm/
