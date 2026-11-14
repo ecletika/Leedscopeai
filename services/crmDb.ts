@@ -262,19 +262,22 @@ export const crmDb = {
   },
 
   async createActivity(activity: CrmActivity): Promise<boolean> {
+    let remoteFailed = false;
     if (isSupabaseConfigured()) {
       const { error } = await supabase
         .from('crm_activities')
         .insert([this.mapActivityToDb(activity)]);
 
       if (!error) return true;
-      console.warn('Supabase activity insert failed, using local fallback:', error);
+      console.error('Supabase activity insert failed, using local fallback:', error);
+      remoteFailed = true;
     }
 
     const activities = readLocal<CrmActivity>(LS_ACTIVITIES_KEY, []);
     activities.push(activity);
     writeLocal(LS_ACTIVITIES_KEY, activities);
-    return true;
+    // false = so ficou guardado neste browser (nao sincronizado com a base de dados)
+    return !remoteFailed;
   },
 
   async getScheduleSlots(sellerId: string, fromIso: string, toIso: string): Promise<CrmScheduleSlot[]> {

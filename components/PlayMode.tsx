@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import TwilioCall from './TwilioCall';
 import {
   AlertTriangle,
@@ -406,7 +406,18 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
   // Resultado da chamada
   const [interest, setInterest] = useState<'low' | 'medium' | 'high'>('medium');
-  const [notes, setNotes] = useState('');
+  // Rascunho das notas: sobrevive a fechar o Play / refrescar a pagina antes de guardar
+  const draftKey = `leadscope_play_notes_${lead.id}`;
+  const [notes, setNotes] = useState(() => {
+    try { return localStorage.getItem(`leadscope_play_notes_${lead.id}`) || ''; } catch { return ''; }
+  });
+  useEffect(() => {
+    try {
+      if (notes.trim()) localStorage.setItem(draftKey, notes);
+      else localStorage.removeItem(draftKey);
+    } catch { /* ignore */ }
+  }, [notes, draftKey]);
+  const finishedRef = useRef(false);
   const [answeredBy, setAnsweredBy] = useState('');
   const [answeredRole, setAnsweredRole] = useState('');
   const [decisionName, setDecisionName] = useState(lead.contactPerson || '');
@@ -624,6 +635,31 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     setAiScore(result.score);
   };
 
+  // "Sair" sem guardar: nao perder as notas da chamada — grava-as no historico do lead
+  const handleExit = async () => {
+    const text = notes.trim();
+    if (text && !finishedRef.current) {
+      const ok = await crmDb.createActivity({
+        id: crypto.randomUUID(),
+        leadId: lead.id,
+        sellerId: lead.responsibleSellerId,
+        activityType: 'call',
+        outcome: 'Chamada (resultado nao concluido)',
+        notes: text,
+        interestLevel: interest,
+        nextActionType: 'none',
+        createdAt: new Date().toISOString()
+      });
+      if (ok) {
+        try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+        onSaved();
+      } else {
+        alert('As notas ficaram guardadas apenas neste browser (falha ao gravar na base de dados).');
+      }
+    }
+    onClose();
+  };
+
   const handleFinish = async () => {
     if (needsCloseReason && !closeReasonId) {
       alert('Escolha um motivo de encerramento antes de guardar.');
@@ -668,7 +704,12 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         nextActionAt: finalNextAt,
         createdAt: new Date().toISOString()
       };
-      await crmDb.createActivity(activity);
+      const syncedActivity = await crmDb.createActivity(activity);
+      if (!syncedActivity) {
+        alert('Atencao: as notas da chamada ficaram guardadas apenas neste browser (falha ao gravar na base de dados). Verifique a ligacao e a migracao das tabelas CRM.');
+      }
+      finishedRef.current = true;
+      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
 
       // 3) Guarda decisor como contacto, se preenchido
       if (decisionName.trim()) {
@@ -813,7 +854,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                 </div>
               </>
             )}
-            <button onClick={onClose} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
+            <button onClick={handleExit} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
               <X className="h-4 w-4" /> Sair
             </button>
           </div>
