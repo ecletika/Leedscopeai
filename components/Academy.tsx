@@ -6,12 +6,17 @@ import {
   CheckCircle,
   ChevronDown,
   Circle,
+  Clock,
   GraduationCap,
   Layers,
   PlayCircle,
-  Target
+  ShieldCheck,
+  Target,
+  Users,
+  Wallet
 } from 'lucide-react';
 import { SEGMENTS } from '../services/segments';
+import { WORKIO_AREAS, WORKIO_MODULES, modulesByArea } from '../services/workioModules';
 
 interface Lesson {
   title: string;
@@ -32,17 +37,19 @@ const WORKIO_LESSONS: Lesson[] = [
   {
     title: '1. O que é o Workio',
     body: [
-      'O Workio organiza a operação diária de equipas: tarefas, checklists, turnos, ocorrências/manutenção e relatórios, tudo no telemóvel e num painel.',
-      'Cada sistema Workio é adaptado a um tipo de negócio. O SOL é o sistema para hotelaria (housekeeping e manutenção).',
-      'O discurso base: menos papel e WhatsApp, mais controlo, histórico e responsabilidade clara.'
+      'O Workio é a plataforma de RH e gestão de pessoas da empresa: ponto, escalas, férias, avaliação, recrutamento, formação, SST, canal de denúncia e muito mais.',
+      'É modular: "Todos os módulos. Liga só os que a sua empresa precisa, quando precisar."',
+      'Quatro áreas: Ponto e pessoas, Talento, Salários e despesas, e Empresa (ver os cursos ao lado).',
+      'O Workio não processa salários: envia o mês ao software que a empresa já usa (PHC, Sage, Primavera, CentralGest ou outro).',
+      'O SOL é um sistema à parte, de housekeeping e operação, só para hotelaria.'
     ]
   },
   {
     title: '2. A quem vendemos',
     body: [
-      'Negócios com equipas operacionais e rotinas repetidas: hotéis, restauração, clínicas, ginásios, retalho, oficinas, limpezas, obras, escolas e condomínios.',
-      'Use a Nova Prospeção para escolher o segmento: o sistema ajusta a pesquisa, a análise e o decisor provável.',
-      'Priorize negócios com várias pessoas na equipa e sinais de desorganização (reviews, atrasos, avarias).'
+      'Empresas com equipas que picam ponto, trabalham por turnos ou têm vários locais: restauração, retalho, clínicas, ginásios, limpezas, construção, logística, oficinas, escolas e hotéis.',
+      'Use a Nova Prospeção para escolher o segmento: o sistema ajusta a pesquisa, a análise e o decisor provável (gerente, diretor de RH, proprietário).',
+      'Priorize empresas com 20+ colaboradores, turnos ou várias lojas. Com 50+ colaboradores o Canal de Denúncia é obrigatório (Lei 93/2021).'
     ]
   },
   {
@@ -57,8 +64,10 @@ const WORKIO_LESSONS: Lesson[] = [
     title: '4. Como responder objeções comuns',
     body: [
       'Nunca discuta. Concorde, faça uma pergunta e mostre valor.',
-      '"Já usamos WhatsApp" -> "Perfeito, muitos começam assim. Conseguem saber quem fez cada tarefa e a que horas?"',
-      '"Não temos orçamento" -> foque no custo de falhas e retrabalho, não no preço da ferramenta.'
+      '"Já usamos folhas de cálculo" -> "Perfeito, muitos começam assim. Quanto tempo o RH gasta a fechar o mês de ponto e horas?"',
+      '"Já temos relógio de ponto" -> "O Workio funciona com o terminal que já tem (por exemplo Anviz) e acrescenta escalas, banco de horas e relatórios."',
+      '"Já temos software de salários" -> "Não o substituímos: enviamos o mês ao seu software e os recibos voltam para a ficha de cada pessoa."',
+      '"Não temos orçamento" -> comece só pelo módulo de que precisa; cada módulo liga-se quando for necessário.'
     ]
   }
 ];
@@ -128,21 +137,51 @@ const SOL_LESSONS: Lesson[] = [
 ];
 
 // --- Sistema 3: Vender por segmento (gerado a partir de services/segments.ts) ---
-const SEGMENT_LESSONS: Lesson[] = SEGMENTS.filter((s) => s.id !== 'hotelaria').map((s) => ({
+const moduleName = (code: string) => WORKIO_MODULES.find((m) => m.code === code)?.name || code;
+
+const SEGMENT_LESSONS: Lesson[] = SEGMENTS.map((s) => ({
   title: s.label,
   body: [
-    `Sistema: ${s.product}.`,
+    `Produto: ${s.product}.`,
     `Decisor provável: ${s.contactRole}.`,
     `Dores típicas: ${s.painPoints.join('; ')}.`,
+    `Módulos a destacar: ${s.keyModules.map(moduleName).join(', ')}.`,
     `Pitch: ${s.pitch}`
   ]
 }));
 
+// --- Um curso por area do Workio; cada modulo e uma licao ---
+const AREA_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  ponto: Clock,
+  talento: Users,
+  salarios: Wallet,
+  empresa: ShieldCheck
+};
+
+const AREA_SYSTEMS: AcademySystem[] = WORKIO_AREAS.map((area) => {
+  const mods = modulesByArea(area.id);
+  return {
+    id: `workio-${area.id}`,
+    name: `Workio · ${area.name}`,
+    description: `${area.tagline} ${mods.length} módulos.`,
+    icon: AREA_ICONS[area.id] || Layers,
+    lessons: mods.map((m) => ({
+      title: `${m.code} · ${m.name}${m.tag ? ` (${m.tag})` : ''}`,
+      body: [m.description, `Mostrar na demo: ${m.demo}.`]
+    })),
+    checklist: [
+      `Conhece os ${mods.length} módulos desta área`,
+      'Sabe fazer a demo de pelo menos 2 módulos',
+      'Sabe a que tipo de empresa vender cada módulo'
+    ]
+  };
+});
+
 const SYSTEMS: AcademySystem[] = [
   {
     id: 'workio',
-    name: 'Workio',
-    description: 'A plataforma, a quem vendemos e como funciona o processo comercial.',
+    name: 'Workio · Visão geral',
+    description: 'O que é o Workio, a quem vendemos e como funciona o processo comercial.',
     icon: Layers,
     lessons: WORKIO_LESSONS,
     checklist: [
@@ -152,6 +191,7 @@ const SYSTEMS: AcademySystem[] = [
       'Sabe responder às objeções mais comuns'
     ]
   },
+  ...AREA_SYSTEMS,
   {
     id: 'sol',
     name: 'SOL · Hotelaria',

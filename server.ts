@@ -8,6 +8,7 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
 import { getSegment, findSegmentByText, isHotelSegment } from "./services/segments";
+import { WORKIO_PRODUCT_SUMMARY } from "./services/workioModules";
 import {
   createSellerFolders,
   listFilesInFolder,
@@ -734,12 +735,12 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       contactPerson: leadData.responsibleName || segment.contactRole,
       diagnosis: `Lead importado em modo gratuito (${segment.label}). Configure GEMINI_API_KEY para diagnóstico automático, reviews e proposta personalizada.`,
       proposal: {
-        siteStructure: ["Aplicação móvel da equipa", "Painel do responsável", "Relatórios e histórico"],
+        siteStructure: ["App do colaborador (ponto, férias, recibos)", "Painel de RH e chefias", "Relatórios automáticos"],
         brandingSuggestion: `Workio para ${segment.label}`,
         techStack: "Web + App Mobile",
         problems: segment.painPoints,
-        solutionFeatures: ["Tarefas e checklists no telemóvel", "Registo de ocorrências com foto", "Painel e relatórios em tempo real"],
-        expectedBenefits: ["Menos falhas de comunicação", "Mais controlo operacional", "Histórico e auditoria"],
+        solutionFeatures: ["Controlo de ponto no telemóvel (QR, rosto ou digital)", "Escalas gráficas e banco de horas automático", "Férias, ausências e relatórios sem folhas de cálculo"],
+        expectedBenefits: ["Menos tempo de RH em tarefas manuais", "Faltas e atrasos visíveis no próprio dia", "Dados prontos para o processamento salarial"],
         estimatedValue: "A definir na proposta"
       }
     };
@@ -1735,19 +1736,20 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
 
         LANGUAGE: STRICTLY EUROPEAN PORTUGUESE (pt-PT).
 
-        CONTEXT: We sell Workio, an operations platform for teams (tasks, checklists, shifts, maintenance tickets, reports).
+        CONTEXT: ${WORKIO_PRODUCT_SUMMARY}
         TARGET SEGMENT: ${segment.label} (${segment.aiHint}).
         TYPICAL PAINS IN THIS SEGMENT: ${segment.painPoints.join("; ")}.
+        MOST RELEVANT WORKIO MODULES: ${segment.keyModules.join(", ")}.
 
         TASK 1: BUSINESS AUDIT
         - Confirm the business is real and active (use search/maps). If it is clearly not a "${segment.label}" business, set "valid" to false.
-        - Check reviews and website for signs of operational problems: delays, disorganisation, cleanliness, missed service, poor coordination.
-        - Estimate team size (${segment.unitLabel}) if possible.
+        - Estimate the number of employees and number of locations/shifts (${segment.unitLabel}). Workio fits companies with enough staff to need time tracking, scheduling and HR admin (typically 10+ employees). Companies with 50+ employees are legally required to have a whistleblowing channel (Lei 93/2021).
+        - Look for signs of HR/workforce pain: many staff or shifts, hiring ads, high turnover in reviews, multiple sites, regulated safety requirements.
         - Infer the most likely decision maker role (e.g. ${segment.contactRole}). Do NOT invent a personal name unless found in a public source.
 
         TASK 2: WORKIO FIT CLASSIFICATION
-        - **HOT**: visible operational pain, multiple locations/teams, or clear growth.
-        - **COLD**: very small, or evidence of strong existing processes/software.
+        - **HOT**: 20+ employees, shift work or multiple sites, active hiring, or clear HR/compliance pressure.
+        - **COLD**: very small team (under ~8) or evidence of an existing HR/time-tracking system.
         - **MEDIUM**: otherwise.
 
         OUTPUT JSON:
@@ -1860,12 +1862,12 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
          },
         diagnosis: data.diagnosis || (segment && !isHotel ? `Pronto para contacto de apresentação do Workio (${segment.label}).` : "Pronto para contacto de apresentação do software de Housekeeping."),
         proposal: segment && !isHotel ? {
-          siteStructure: ["Aplicação móvel da equipa", "Painel do responsável", "Relatórios e histórico"],
+          siteStructure: ["App do colaborador (ponto, férias, recibos)", "Painel de RH e chefias", "Relatórios automáticos"],
           brandingSuggestion: `Workio para ${segment.label}`,
           techStack: "Web + App Mobile",
           problems: data.problems || segment.painPoints,
-          solutionFeatures: data.solutionFeatures || ["Tarefas e checklists no telemóvel", "Registo de ocorrências com foto", "Painel e relatórios em tempo real"],
-          expectedBenefits: data.expectedBenefits || ["Menos falhas de comunicação", "Mais controlo operacional", "Histórico e auditoria de tudo o que foi feito"],
+          solutionFeatures: data.solutionFeatures || ["Controlo de ponto no telemóvel (QR, rosto ou digital)", "Escalas gráficas e banco de horas automático", "Férias, ausências e relatórios sem folhas de cálculo"],
+          expectedBenefits: data.expectedBenefits || ["Menos tempo de RH em tarefas manuais", "Faltas e atrasos visíveis no próprio dia", "Dados prontos para o processamento salarial"],
           estimatedValue: "A definir na proposta"
         } : {
           siteStructure: ["Aplicação Móvel das Empregadas", "Painel Administrativo da Governanta", "Ecrã de Status da Receção"],

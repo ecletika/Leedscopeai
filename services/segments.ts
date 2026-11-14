@@ -2,8 +2,12 @@
  * Segmentos de mercado para a Nova Prospeccao.
  * Partilhado entre o frontend (seletor) e o servidor (pesquisa + analise IA).
  *
- * NOTA: os textos de dores/pitch sao um rascunho de trabalho — devem ser
- * revistos pela equipa comercial do Workio.
+ * O Workio e uma plataforma modular de RH / gestao de pessoas (ponto, escalas,
+ * ferias, avaliacao, recrutamento, formacao, SST, canal de denuncia...).
+ * O SOL e o sistema de housekeeping/operacao so para hotelaria.
+ *
+ * NOTA: dores e pitches por segmento sao um rascunho de trabalho — devem ser
+ * revistos pela equipa comercial.
  */
 export interface Segment {
   id: string;
@@ -18,8 +22,10 @@ export interface Segment {
   contactRole: string;
   /** Unidade de dimensao tipica (quartos, lugares, colaboradores...) */
   unitLabel: string;
-  /** Sistema Workio mais relevante para este segmento */
+  /** Produto mais relevante para este segmento */
   product: string;
+  /** Codigos dos modulos Workio mais relevantes (ver workioModules.ts) */
+  keyModules: string[];
   painPoints: string[];
   pitch: string;
 }
@@ -33,13 +39,14 @@ export const SEGMENTS: Segment[] = [
     aiHint: 'hotéis, alojamento local, guest houses, pousadas e resorts',
     contactRole: 'Diretor de Operações / Governanta-Geral',
     unitLabel: 'quartos',
-    product: 'SOL (housekeeping e operação hoteleira)',
+    product: 'SOL (housekeeping e operação hoteleira) + Workio (ponto e escalas)',
+    keyModules: ['M01', 'M18', 'M17', 'M03'],
     painPoints: [
-      'Quartos prontos tarde e receção sem visibilidade',
-      'Comunicação por WhatsApp/papel sem histórico',
-      'Manutenção sem responsável nem registo'
+      'Quartos prontos tarde e receção sem visibilidade (SOL)',
+      'Escalas de turnos e folgas montadas à mão',
+      'Horas extra e banco de horas sem controlo'
     ],
-    pitch: 'Coordenar housekeeping, manutenção e receção em tempo real, num só sistema.'
+    pitch: 'SOL para coordenar housekeeping e manutenção; Workio para ponto, escalas e gestão da equipa.'
   },
   {
     id: 'restauracao',
@@ -48,14 +55,15 @@ export const SEGMENTS: Segment[] = [
     osmTerm: 'restaurant',
     aiHint: 'restaurantes, cafés, pastelarias, bares e catering independentes',
     contactRole: 'Gerente / Proprietário',
-    unitLabel: 'lugares',
-    product: 'Workio Operações (turnos, checklists, tarefas)',
+    unitLabel: 'colaboradores',
+    product: 'Workio',
+    keyModules: ['M18', 'M01', 'M17', 'M03'],
     painPoints: [
-      'Checklists de abertura/fecho e higiene em papel',
-      'Escalas e trocas de turno por mensagem',
-      'Falhas de comunicação entre sala e cozinha'
+      'Escalas e trocas de turno por WhatsApp',
+      'Horas extra e folgas difíceis de controlar',
+      'Rotatividade alta e onboarding repetido'
     ],
-    pitch: 'Checklists, tarefas e turnos da equipa organizados e auditáveis no telemóvel.'
+    pitch: 'Escalas gráficas publicadas à equipa, ponto no telemóvel e banco de horas automático.'
   },
   {
     id: 'clinicas',
@@ -64,14 +72,15 @@ export const SEGMENTS: Segment[] = [
     osmTerm: 'clinic',
     aiHint: 'clínicas médicas, dentárias, de fisioterapia e consultórios privados',
     contactRole: 'Diretor Clínico / Gestor da Clínica',
-    unitLabel: 'gabinetes',
-    product: 'Workio Operações (checklists, manutenção, equipas)',
+    unitLabel: 'colaboradores',
+    product: 'Workio',
+    keyModules: ['M09', 'M01', 'M08', 'M03'],
     painPoints: [
-      'Registo de limpeza e desinfeção de gabinetes',
-      'Manutenção de equipamentos sem histórico',
-      'Coordenação entre receção e equipa clínica'
+      'Fichas de aptidão e EPI com validades por controlar',
+      'Formação obrigatória sem registo de horas',
+      'Férias e ausências geridas em papel ou Excel'
     ],
-    pitch: 'Rotinas, registos e manutenção de gabinetes com histórico e responsáveis claros.'
+    pitch: 'SST com avisos de validade, formação com horas contadas e gestão de férias e ausências.'
   },
   {
     id: 'ginasios',
@@ -81,13 +90,14 @@ export const SEGMENTS: Segment[] = [
     aiHint: 'ginásios, health clubs, estúdios de fitness, pilates e crossfit',
     contactRole: 'Gerente / Proprietário',
     unitLabel: 'colaboradores',
-    product: 'Workio Operações (limpeza, manutenção, equipa)',
+    product: 'Workio',
+    keyModules: ['M18', 'M01', 'M13', 'M17'],
     painPoints: [
-      'Limpeza de balneários e salas sem controlo',
-      'Avarias de equipamentos sem registo',
-      'Escalas de monitores e rececionistas'
+      'Monitores e rececionistas com horários variáveis',
+      'Picagem em papel ou sem controlo real',
+      'Pagamento de horas e aulas sem mapa claro'
     ],
-    pitch: 'Controlo de limpeza, manutenção de máquinas e escalas num só lugar.'
+    pitch: 'Terminal de ponto num tablet à receção, escalas e mapa de horas automático.'
   },
   {
     id: 'retalho',
@@ -95,15 +105,16 @@ export const SEGMENTS: Segment[] = [
     searchTerm: 'Lojas',
     osmTerm: 'shop',
     aiHint: 'lojas independentes, supermercados locais, boutiques e pequenas redes de retalho',
-    contactRole: 'Gerente de Loja / Proprietário',
+    contactRole: 'Gerente de Loja / Diretor de RH',
     unitLabel: 'lojas',
-    product: 'Workio Operações (tarefas por loja, checklists)',
+    product: 'Workio',
+    keyModules: ['M01', 'M18', 'M02', 'M14'],
     painPoints: [
-      'Tarefas de reposição e abertura sem acompanhamento',
-      'Várias lojas sem visão central',
-      'Comunicação sede-loja dispersa'
+      'Várias lojas sem visão central das picagens',
+      'Faltas e atrasos conhecidos só no fim do mês',
+      'Escalas por loja feitas à mão'
     ],
-    pitch: 'Tarefas e checklists por loja, com visão central para a gestão.'
+    pitch: 'Ponto por loja com alertas no próprio dia e relatórios automáticos para a gestão.'
   },
   {
     id: 'oficinas',
@@ -113,29 +124,31 @@ export const SEGMENTS: Segment[] = [
     aiHint: 'oficinas de reparação automóvel, stands, centros de pneus e lavagens',
     contactRole: 'Chefe de Oficina / Proprietário',
     unitLabel: 'colaboradores',
-    product: 'Workio Operações (ordens de trabalho, equipas)',
+    product: 'Workio',
+    keyModules: ['M09', 'M01', 'M05', 'M17'],
     painPoints: [
-      'Ordens de trabalho em papel',
-      'Sem visibilidade do estado de cada viatura',
-      'Prazos falhados por falta de coordenação'
+      'EPI e medicina do trabalho por controlar',
+      'Despesas e deslocações sem registo',
+      'Horas extra sem mapa'
     ],
-    pitch: 'Ordens de trabalho e estado de cada intervenção visíveis em tempo real.'
+    pitch: 'SST com avisos de validade, despesas com foto do talão e ponto simples.'
   },
   {
     id: 'limpezas',
     label: 'Empresas de limpeza e facility',
     searchTerm: 'Empresas de limpeza',
     osmTerm: 'cleaning company',
-    aiHint: 'empresas de limpeza, facility services, manutenção de edifícios e condomínios',
+    aiHint: 'empresas de limpeza, facility services, segurança privada e manutenção de edifícios',
     contactRole: 'Diretor Operacional / Gerente',
     unitLabel: 'colaboradores',
-    product: 'Workio Operações (rondas, checklists, ocorrências)',
+    product: 'Workio',
+    keyModules: ['M01', 'M13', 'M18', 'M09'],
     painPoints: [
-      'Provar ao cliente que o serviço foi feito',
-      'Equipas em vários locais sem supervisão',
-      'Ocorrências e consumíveis sem registo'
+      'Equipas em vários locais, picagem difícil de validar',
+      'Muitas pessoas, rotatividade e escalas complexas',
+      'EPI e fichas de aptidão em grande volume'
     ],
-    pitch: 'Rondas, checklists com foto e ocorrências para provar o serviço ao cliente.'
+    pitch: 'Picagem por QR ou rosto em cada local, escalas e controlo de EPI e aptidões.'
   },
   {
     id: 'construcao',
@@ -145,13 +158,14 @@ export const SEGMENTS: Segment[] = [
     aiHint: 'empresas de construção civil, remodelações, empreiteiros e engenharia',
     contactRole: 'Diretor de Obra / Gerente',
     unitLabel: 'obras',
-    product: 'Workio Operações (tarefas de obra, equipas, registos)',
+    product: 'Workio',
+    keyModules: ['M09', 'M01', 'M05', 'M20'],
     painPoints: [
-      'Várias obras em simultâneo sem visão central',
-      'Registos e ocorrências em papel',
-      'Atrasos por falhas de comunicação'
+      'Várias obras em simultâneo sem controlo de presenças',
+      'SST, EPI e inspeções com validades difíceis de seguir',
+      'Despesas de deslocação e equipamentos sem registo'
     ],
-    pitch: 'Tarefas, equipas e registos de cada obra num painel único.'
+    pitch: 'Presenças por obra, SST com avisos de validade e inventário de equipamentos.'
   },
   {
     id: 'escolas',
@@ -160,30 +174,32 @@ export const SEGMENTS: Segment[] = [
     osmTerm: 'school',
     aiHint: 'escolas privadas, colégios, centros de formação e academias de línguas',
     contactRole: 'Diretor / Coordenador Administrativo',
-    unitLabel: 'salas',
-    product: 'Workio Operações + Academia (formação de equipas)',
+    unitLabel: 'colaboradores',
+    product: 'Workio',
+    keyModules: ['M03', 'M08', 'M06', 'M27'],
     painPoints: [
-      'Manutenção e limpeza de salas sem registo',
-      'Pedidos internos por e-mail e telefone',
-      'Formação de pessoal sem acompanhamento'
+      'Férias e ausências do pessoal docente e não docente',
+      'Formação anual sem registo das 40 horas',
+      'Avaliação de desempenho em papel'
     ],
-    pitch: 'Pedidos internos, manutenção e formação da equipa organizados.'
+    pitch: 'Gestão de pessoas, formação com horas contadas e ciclos de avaliação.'
   },
   {
-    id: 'condominios',
-    label: 'Condomínios e gestão de edifícios',
-    searchTerm: 'Gestão de condomínios',
-    osmTerm: 'property management',
-    aiHint: 'administração de condomínios, gestão de edifícios e imobiliárias com gestão de imóveis',
-    contactRole: 'Gestor de Condomínios / Diretor',
-    unitLabel: 'edifícios',
-    product: 'Workio Operações (ocorrências, manutenção)',
+    id: 'logistica',
+    label: 'Logística e armazéns',
+    searchTerm: 'Logística e armazéns',
+    osmTerm: 'logistics warehouse',
+    aiHint: 'empresas de logística, transportes, armazéns e distribuição',
+    contactRole: 'Diretor de Operações / Responsável de RH',
+    unitLabel: 'colaboradores',
+    product: 'Workio',
+    keyModules: ['M01', 'M18', 'M17', 'M09'],
     painPoints: [
-      'Ocorrências dos condóminos sem seguimento',
-      'Fornecedores de manutenção sem controlo',
-      'Falta de histórico por edifício'
+      'Turnos rotativos e noturnos com cálculo manual',
+      'Horas extra e banco de horas sem regras claras',
+      'EPI e aptidões com validade por controlar'
     ],
-    pitch: 'Ocorrências, fornecedores e manutenção por edifício com histórico completo.'
+    pitch: 'Ponto por turno, banco de horas automático e controlo de SST.'
   }
 ];
 

@@ -17,7 +17,6 @@ import PlayMode from './PlayMode';
 import DemoMode from './DemoMode';
 import MessageTemplates from './MessageTemplates';
 import QualificationModal from './QualificationModal';
-import { EmailInbox } from './EmailInbox';
 import SalesTools from './SalesTools';
 import ProposalBuilder from './ProposalBuilder';
 import ThemeToggle from './ThemeToggle';
@@ -64,6 +63,16 @@ const addSeenLeads = (key: string, names: string[]) => {
   localStorage.setItem(key, JSON.stringify(Array.from(merged)));
 };
 
+type TabId = 'dashboard' | 'database' | 'pipeline' | 'followup' | 'tools' | 'academy' | 'crm' | 'contracts' | 'sellers' | 'library' | 'history' | 'admin';
+
+interface NavItem {
+  tab: TabId;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  badge?: number;
+  badgeTone?: string;
+}
+
 interface DashboardProps {
   currentUser: User;
   allUsers: User[];
@@ -72,7 +81,9 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'database' | 'pipeline' | 'planner' | 'followup' | 'tools' | 'academy' | 'agenda' | 'crm' | 'contracts' | 'sellers' | 'library' | 'history' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  // "Hoje": follow-ups e planeador semanal no mesmo ecra
+  const [todayView, setTodayView] = useState<'followup' | 'planner'>('followup');
 
   // CRM Play mode overlay
   const [activeLeadForPlay, setActiveLeadForPlay] = useState<Lead | null>(null);
@@ -638,6 +649,48 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
       return true;
   });
 
+  // Menu lateral agrupado por area de trabalho
+  const isAdmin = currentUser.role === 'admin';
+  const overdueCount = savedHotels.filter(h =>
+    h.nextActionAt && new Date(h.nextActionAt) < new Date() && !['won', 'lost', 'do_not_contact'].includes(h.commercialStatus || 'new')
+  ).length;
+
+  const navGroups: { title: string; items: NavItem[] }[] = [
+    {
+      title: 'Prospeção',
+      items: [
+        { tab: 'dashboard', label: 'Nova Prospeção', icon: Search },
+        { tab: 'database', label: 'Leads & CRM', icon: Database, badge: savedHotels.length }
+      ]
+    },
+    {
+      title: 'Vendas',
+      items: [
+        { tab: 'followup', label: 'Hoje', icon: CalendarClock, badge: overdueCount, badgeTone: 'bg-rose-600' },
+        { tab: 'pipeline', label: 'Pipeline', icon: KanbanSquare }
+      ]
+    },
+    {
+      title: 'Formação e materiais',
+      items: [
+        { tab: 'academy', label: 'Academia Workio', icon: GraduationCap },
+        { tab: 'tools', label: 'Ferramentas de Venda', icon: Lightbulb },
+        ...(isAdmin ? [{ tab: 'library' as TabId, label: 'Scripts & Materiais', icon: BookOpen }] : [])
+      ]
+    },
+    {
+      title: 'Gestão',
+      items: [
+        { tab: 'crm', label: 'Dashboard Vendas', icon: BarChart3 },
+        ...(isAdmin ? [
+          { tab: 'contracts' as TabId, label: 'Contratos', icon: FileSignature },
+          { tab: 'sellers' as TabId, label: 'Equipa Comercial', icon: Users },
+          { tab: 'admin' as TabId, label: 'Admin Console', icon: UserCog }
+        ] : [])
+      ]
+    }
+  ];
+
   return (
     <div className="flex h-screen bg-ai-dark text-white overflow-hidden font-sans">
       <aside className="sol-sidebar w-64 h-screen min-h-0 border-r border-gray-800 hidden md:flex flex-col p-4 shrink-0">
@@ -647,139 +700,37 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm tracking-tight text-white">LeadScope</span>
-              <span className="text-[10px] text-emerald-400 font-mono tracking-wider font-bold">HOUSEKEEPING</span>
+              <span className="text-[10px] text-emerald-400 font-mono tracking-wider font-bold">WORKIO · VENDAS</span>
             </div>
         </div>
-        <nav className="space-y-1.5 flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 -mr-1">
-            <button 
-                onClick={() => setActiveTab('dashboard')} 
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'dashboard' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <Search className="w-4 h-4" /> Nova Prospeção
-            </button>
+        <nav className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 -mr-1">
+            {navGroups.map((group) => (
+                <div key={group.title} className="mb-4">
+                    <div className="px-2 mb-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-600">{group.title}</div>
+                    <div className="space-y-1">
+                        {group.items.map((item) => {
+                            const Icon = item.icon;
+                            const active = activeTab === item.tab;
+                            return (
+                                <button
+                                    key={item.tab}
+                                    onClick={() => setActiveTab(item.tab)}
+                                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${active ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+                                >
+                                    <Icon className="w-4 h-4" /> {item.label}
+                                    {item.badge ? (
+                                        <span className={`ml-auto px-1.5 py-0.5 text-[9px] text-white rounded font-mono font-bold leading-none ${item.badgeTone || 'bg-emerald-600'}`}>
+                                            {item.badge}
+                                        </span>
+                                    ) : null}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
 
-            <button 
-                onClick={() => setActiveTab('database')} 
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'database' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <Database className="w-4 h-4" /> Base de Dados CRM
-                {savedHotels.length > 0 && (
-                  <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-emerald-600 text-white rounded font-mono font-bold leading-none">
-                    {savedHotels.length}
-                  </span>
-                )}
-            </button>
-
-            <button
-                onClick={() => setActiveTab('pipeline')}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'pipeline' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <KanbanSquare className="w-4 h-4" /> Pipeline
-            </button>
-
-            <button
-                onClick={() => setActiveTab('planner')}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'planner' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <CalendarClock className="w-4 h-4" /> Planeador Semanal
-            </button>
-
-            <button
-                onClick={() => setActiveTab('followup')}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'followup' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <RotateCcw className="w-4 h-4" /> Follow-ups
-                {savedHotels.filter(h => h.nextActionAt && new Date(h.nextActionAt) < new Date() && !['won','lost','do_not_contact'].includes(h.commercialStatus || 'new')).length > 0 && (
-                  <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-rose-600 text-white rounded font-mono font-bold leading-none">
-                    {savedHotels.filter(h => h.nextActionAt && new Date(h.nextActionAt) < new Date() && !['won','lost','do_not_contact'].includes(h.commercialStatus || 'new')).length}
-                  </span>
-                )}
-            </button>
-
-            <button
-                onClick={() => setActiveTab('agenda')}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'agenda' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <Calendar className="w-4 h-4" /> Agenda de Chamadas
-                {savedHotels.filter(h => h.callbackScheduledAt && h.callbackStatus === 'pending').length > 0 && (
-                  <span className="ml-auto px-1.5 py-0.5 text-[9px] bg-rose-600 text-white rounded font-mono font-bold leading-none">
-                    {savedHotels.filter(h => h.callbackScheduledAt && h.callbackStatus === 'pending').length}
-                  </span>
-                )}
-            </button>
-            
-            <button
-                onClick={() => setActiveTab('tools')}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'tools' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <Lightbulb className="w-4 h-4" /> Ferramentas de Venda
-            </button>
-
-            <button
-                onClick={() => setActiveTab('academy')}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'academy' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <GraduationCap className="w-4 h-4" /> Academia Workio
-            </button>
-
-            <button
-                onClick={() => setActiveTab('email')}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'email' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <Mail className="w-4 h-4" /> Caixa de Email
-            </button>
-
-            <button
-                onClick={() => setActiveTab('crm')}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'crm' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <BarChart3 className="w-4 h-4" /> Dashboard Vendas
-            </button>
-
-            {currentUser.role === 'admin' && (
-                <button
-                    onClick={() => setActiveTab('contracts')}
-                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'contracts' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-                >
-                    <FileSignature className="w-4 h-4" /> Contratos
-                </button>
-            )}
-
-            {currentUser.role === 'admin' && (
-                <button
-                    onClick={() => setActiveTab('sellers')}
-                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'sellers' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-                >
-                    <Users className="w-4 h-4" /> Equipa Comercial
-                </button>
-            )}
-
-            {currentUser.role === 'admin' && (
-                <button
-                    onClick={() => setActiveTab('library')}
-                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'library' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-                >
-                    <BookOpen className="w-4 h-4" /> Scripts & Materiais
-                </button>
-            )}
-
-            <button
-                onClick={() => { setActiveTab('history'); setSelectedCampaign(null); }}
-                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'history' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-            >
-                <History className="w-4 h-4" /> Histórico Campanhas
-            </button>
-
-            {currentUser.role === 'admin' && (
-                <button 
-                    onClick={() => setActiveTab('admin')} 
-                    className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'admin' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
-                >
-                    <UserCog className="w-4 h-4" /> Admin Console
-                </button>
-            )}
-
-            <button onClick={onLogout} className="w-full text-left px-4.5 py-2.5 text-gray-500 hover:text-rose-400 text-xs font-bold flex items-center gap-3 mt-6 border border-transparent">
+            <button onClick={onLogout} className="w-full text-left px-4.5 py-2.5 text-gray-500 hover:text-rose-400 text-xs font-bold flex items-center gap-3 mt-2 border border-transparent">
                 <LogOut className="w-4 h-4" /> Terminar Sessão
             </button>
         </nav>
@@ -795,12 +746,9 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 {activeTab === 'dashboard' && 'Nova Prospeção'}
                 {activeTab === 'database' && 'Base de Dados de Hotéis & CRM'}
                 {activeTab === 'pipeline' && 'Pipeline Comercial'}
-                {activeTab === 'planner' && 'Planeador Comercial Semanal'}
-                {activeTab === 'followup' && 'Follow-up e Reagendamentos'}
+                {activeTab === 'followup' && 'Hoje: follow-ups e planeamento'}
                 {activeTab === 'tools' && 'Ferramentas de Venda'}
                 {activeTab === 'academy' && 'Academia Workio'}
-                {activeTab === 'email' && 'Caixa de Email'}
-                {activeTab === 'agenda' && 'Agenda para Voltar Contactos (Callbacks)'}
                 {activeTab === 'crm' && 'Dashboard de Vendas'}
                 {activeTab === 'contracts' && 'Gerador de Contratos'}
                 {activeTab === 'sellers' && 'Equipa Comercial'}
@@ -832,14 +780,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             </div>
         </header>
 
-        {/* --- CAIXA DE EMAIL — full height, no padding, no scroll --- */}
-        {activeTab === 'email' && (
-            <div className="flex-1 overflow-hidden">
-                <EmailInbox sellerId={currentSeller?.id ?? currentUser.id} />
-            </div>
-        )}
-
-        <div className={`flex-1 overflow-y-auto p-6 ${activeTab === 'email' ? 'hidden' : ''}`}>
+        <div className="flex-1 overflow-y-auto p-6">
 
             {/* --- DASHBOARD (NEW CAMPAIGN) --- */}
             {activeTab === 'dashboard' && (
@@ -1038,17 +979,26 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 </div>
             )}
 
-            {/* --- PLANEADOR SEMANAL --- */}
-            {activeTab === 'planner' && (
-                <div className="space-y-6 animate-in fade-in duration-300 text-left">
-                    <WeeklyPlanner onOpenPlay={handleOpenPlay} restrictSellerId={restrictSellerId} />
-                </div>
-            )}
-
-            {/* --- FOLLOW-UP E REAGENDAMENTOS (M29) --- */}
+            {/* --- HOJE: FOLLOW-UPS (M29) + PLANEADOR SEMANAL --- */}
             {activeTab === 'followup' && (
                 <div className="space-y-6 animate-in fade-in duration-300 text-left">
-                    <FollowUpCenter onOpenPlay={handleOpenPlay} restrictSellerId={restrictSellerId} />
+                    <div className="inline-flex rounded-lg border border-gray-800 bg-ai-card p-1">
+                        {([
+                            { id: 'followup', label: 'Follow-ups e reagendamentos' },
+                            { id: 'planner', label: 'Planeador semanal' }
+                        ] as const).map((v) => (
+                            <button
+                                key={v.id}
+                                onClick={() => setTodayView(v.id)}
+                                className={`rounded-md px-4 py-1.5 text-xs font-bold transition ${todayView === v.id ? 'bg-emerald-600/15 text-emerald-300' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                {v.label}
+                            </button>
+                        ))}
+                    </div>
+                    {todayView === 'followup'
+                        ? <FollowUpCenter onOpenPlay={handleOpenPlay} restrictSellerId={restrictSellerId} />
+                        : <WeeklyPlanner onOpenPlay={handleOpenPlay} restrictSellerId={restrictSellerId} />}
                 </div>
             )}
 
@@ -1091,132 +1041,6 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             {activeTab === 'library' && (
                 <div className="space-y-6 animate-in fade-in duration-300 text-left">
                     <CommercialLibrary />
-                </div>
-            )}
-
-            {/* --- AGENDA (CALLBACKS) VIEW --- */}
-            {activeTab === 'agenda' && (
-                <div className="space-y-6 animate-in fade-in duration-300">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl font-bold flex items-center gap-2 text-white">
-                                <Calendar className="text-rose-500 w-5 h-5 animate-pulse" /> Agenda de Chamadas de Retorno
-                            </h2>
-                            <p className="text-xs text-gray-400 mt-1">Efetue e acompanhe chamadas de seguimento programadas no CRM.</p>
-                        </div>
-                    </div>
-
-                    {/* Scheduler Queue Layout */}
-                    {savedHotels.filter(h => h.callbackScheduledAt).length === 0 ? (
-                        <div className="bg-ai-card border border-gray-800 rounded-xl p-12 text-center text-gray-500">
-                            <Calendar className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                            <h3 className="font-bold text-white text-base">Nenhuma chamada agendada na agenda</h3>
-                            <p className="text-xs text-gray-400 max-w-sm mx-auto mt-1">Vá para a <strong>Base de Dados CRM</strong>, clique em "Registar Conversa" em qualquer hotel e programe um dia e hora de retorno!</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {savedHotels
-                                .filter(h => h.callbackScheduledAt)
-                                .sort((a,b) => new Date(a.callbackScheduledAt!).getTime() - new Date(b.callbackScheduledAt!).getTime())
-                                .map(hotel => {
-                                    const isCompleted = hotel.callbackStatus === 'completed';
-                                    const isCanceled = hotel.callbackStatus === 'canceled';
-                                    const callbackTime = new Date(hotel.callbackScheduledAt!).getTime();
-                                    const rightNow = Date.now();
-                                    const isToday = new Date(hotel.callbackScheduledAt!).toDateString() === new Date().toDateString();
-                                    const isPast = callbackTime < rightNow && !isCompleted && !isCanceled;
-
-                                    return (
-                                        <div key={hotel.id} className={`bg-ai-card border rounded-xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 transition-all ${
-                                          isCompleted ? 'border-gray-800 opacity-60' : 
-                                          isCanceled ? 'border-gray-800/40 opacity-40 line-through' :
-                                          isPast ? 'border-rose-500/50 shadow-lg shadow-rose-950/10' :
-                                          isToday ? 'border-amber-500/50 shadow-lg shadow-amber-950/10' :
-                                          'border-gray-800'
-                                        }`}>
-                                            {/* Urgency indicators left column */}
-                                            <div className="flex-1 min-w-[300px]">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                                      isCompleted ? 'bg-gray-800 text-gray-400' :
-                                                      isCanceled ? 'bg-gray-800 text-gray-500' :
-                                                      isPast ? 'bg-rose-500 text-white' :
-                                                      isToday ? 'bg-amber-500 text-black' :
-                                                      'bg-emerald-600 text-white'
-                                                    }`}>
-                                                        {isCompleted ? 'EFETUADA' :
-                                                         isCanceled ? 'CANCELADA' :
-                                                         isPast ? 'ATRASADA (LIGAR JÁ!)' :
-                                                         isToday ? 'HOJE' : 'AGENDADA'}
-                                                    </span>
-
-                                                    <span className="text-xs text-gray-400 font-mono font-bold">
-                                                        📅 {new Date(hotel.callbackScheduledAt!).toLocaleString('pt-PT')}
-                                                    </span>
-                                                </div>
-
-                                                <h3 className="font-bold text-white text-lg">{hotel.companyName}</h3>
-                                                <p className="text-xs text-gray-400 flex items-center gap-1 mt-1 mb-3">
-                                                    <MapPin className="w-3 h-3 text-gray-500" /> {hotel.location} | Persona: <strong>{hotel.contactPerson || 'Governanta-Geral'}</strong>
-                                                </p>
-
-                                                <div className="bg-gray-850/40 rounded-lg p-3 border border-gray-800/50 text-xs">
-                                                    <strong className="text-gray-400 block mb-1">📋 Notas Atuais / Enunciado Combinado:</strong>
-                                                    <span className="text-gray-300 italic">{hotel.contactNotes || "Nenhuma nota inserida."}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Action right column */}
-                                            <div className="flex md:flex-col items-center md:items-end justify-between shrink-0 gap-4 w-full md:w-auto">
-                                                <div className="text-left md:text-right">
-                                                    <span className="block text-gray-500 text-xs uppercase font-bold">Contacto Principal</span>
-                                                    {hotel.phone ? (
-                                                        <a href={`tel:${hotel.phone}`} className="text-xl font-bold font-mono text-emerald-400 hover:underline">{hotel.phone}</a>
-                                                    ) : (
-                                                        <span className="text-rose-400 font-bold italic">Sem Telefone</span>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex items-center gap-2">
-                                                    {!isCompleted && !isCanceled && (
-                                                      <button 
-                                                          onClick={async () => {
-                                                            await hotelDb.updateCallback(hotel.id, hotel.callbackScheduledAt, 'completed');
-                                                            await loadSavedHotels();
-                                                            alert("Chamada marcada como efetuada com sucesso!");
-                                                          }}
-                                                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-all"
-                                                        >
-                                                            <CheckCircle className="w-3.5 h-3.5" /> Marcar Efetuada
-                                                      </button>
-                                                    )}
-
-                                                    <button 
-                                                      onClick={() => setEditingHotel(hotel)}
-                                                      className="px-3.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 border border-gray-700 rounded-lg text-xs transition-all flex items-center gap-1"
-                                                    >
-                                                        <Edit className="w-3.5 h-3.5" /> Alterar/Reagendar
-                                                    </button>
-
-                                                    {!isCompleted && !isCanceled && (
-                                                        <button 
-                                                          onClick={async () => {
-                                                            await hotelDb.updateCallback(hotel.id, hotel.callbackScheduledAt, 'canceled');
-                                                            await loadSavedHotels();
-                                                          }}
-                                                          className="p-2 bg-gray-800 hover:bg-rose-500/20 text-rose-400 hover:text-white border border-gray-700 rounded-lg transition-all"
-                                                          title="Cancelar Callback"
-                                                        >
-                                                            <X className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                        </div>
-                    )}
                 </div>
             )}
 
@@ -1425,83 +1249,6 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                             </footer>
                         </form>
                     </div>
-                </div>
-            )}
-
-            {/* --- HISTORY VIEW --- */}
-            {activeTab === 'history' && (
-                <div className="space-y-6">
-                    {!selectedCampaign ? (
-                        <div className="grid grid-cols-1 gap-4">
-                            {currentUser.campaigns.length === 0 && (
-                                <div className="text-center text-gray-500 py-10">
-                                    Nenhuma campanha encontrada no histórico.
-                                </div>
-                            )}
-                            {currentUser.campaigns.map(camp => (
-                                <div key={camp.id} onClick={() => setSelectedCampaign(camp)} className="bg-ai-card border border-gray-700 hover:border-ai-accent p-4 rounded-xl cursor-pointer transition-all flex items-center justify-between group">
-                                    <div>
-                                        <h3 className="font-bold text-white group-hover:text-ai-accent">{camp.name}</h3>
-                                        <p className="text-xs text-gray-400 mt-1 flex items-center gap-4">
-                                            <span><Calendar className="w-3 h-3 inline mr-1"/> {new Date(camp.date).toLocaleDateString()}</span>
-                                            <span><MapPin className="w-3 h-3 inline mr-1"/> {camp.location || "N/A"}</span>
-                                            <span><Target className="w-3 h-3 inline mr-1"/> {camp.niche || "N/A"}</span>
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-right">
-                                            <span className="block text-xl font-bold text-white">{camp.leads.length}</span>
-                                            <span className="text-xs text-gray-500 uppercase">Leads</span>
-                                        </div>
-                                        <ChevronRight className="text-gray-500 group-hover:text-white" />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div>
-                            <button onClick={() => setSelectedCampaign(null)} className="mb-4 text-sm text-gray-400 hover:text-white flex items-center gap-1">
-                                &larr; Voltar ao Histórico
-                            </button>
-                            <div className="flex items-center justify-between mb-6">
-                                <h2 className="text-xl font-bold text-white">
-                                    Campanha: <span className="text-ai-accent">{selectedCampaign.name}</span>
-                                </h2>
-                                <span className="text-sm text-gray-400">
-                                    {new Date(selectedCampaign.date).toLocaleString()}
-                                </span>
-                            </div>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                                <div className="relative">
-                                    <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-500" />
-                                    <input 
-                                        placeholder="Filtrar por nome..." 
-                                        className="bg-gray-800 border border-gray-700 rounded pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-ai-accent"
-                                        value={textFilter}
-                                        onChange={(e) => setTextFilter(e.target.value)}
-                                    />
-                                </div>
-                                <div className="relative">
-                                    <Hash className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-500" />
-                                    <input 
-                                        placeholder="Filtrar por CAE..." 
-                                        className="bg-gray-800 border border-gray-700 rounded pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-ai-accent w-32"
-                                        value={caeFilter}
-                                        onChange={(e) => setCaeFilter(e.target.value)}
-                                    />
-                                </div>
-                            </div>
-                            <LeadResults 
-                                leads={filteredLeads} 
-                                onInvestigate={handleInvestigateStorefront} 
-                                onGenerateProposal={handleOpenProposal}
-                                onAskAI={handleOpenChat}
-                                onGenerateSite={handleGenerateSite}
-                                onSaveToDb={handleSaveToDb}
-                                savedLeadNames={savedHotels.map(h => h.companyName.toLowerCase().trim())}
-                            />
-                        </div>
-                    )}
                 </div>
             )}
 

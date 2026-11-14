@@ -366,17 +366,30 @@ const statusButtons: {
   tone: string;
   needsReschedule?: boolean;
   needsCloseReason?: boolean;
+  /** Dias ate a proxima accao sugerida no dialogo de confirmacao */
+  autoDays?: number;
+  /** Texto de ajuda mostrado no dialogo */
+  hint?: string;
 }[] = [
-  { label: 'Agendar demo', status: 'demo_scheduled', nextAction: 'demo', tone: 'bg-orange-600 hover:bg-orange-500', needsReschedule: true },
-  { label: 'Decisor identificado', status: 'decision_maker_identified', nextAction: 'call', tone: 'bg-fuchsia-600 hover:bg-fuchsia-500' },
-  { label: 'Reagendar contacto', status: 'rescheduled', nextAction: 'call', tone: 'bg-amber-600 hover:bg-amber-500', needsReschedule: true },
-  { label: 'Enviar email', status: 'follow_up', nextAction: 'email', tone: 'bg-sky-600 hover:bg-sky-500' },
-  { label: 'Pediu ligar depois', status: 'rescheduled', nextAction: 'call', tone: 'bg-yellow-600 hover:bg-yellow-500', needsReschedule: true },
-  { label: 'Contactado recepcao', status: 'contacted_reception', nextAction: 'call', tone: 'bg-violet-600 hover:bg-violet-500' },
-  { label: 'Sem resposta', status: 'scheduled_contact', nextAction: 'call', tone: 'bg-slate-600 hover:bg-slate-500', needsReschedule: true },
+  { label: 'Agendar demo', status: 'demo_scheduled', nextAction: 'demo', tone: 'bg-orange-600 hover:bg-orange-500', needsReschedule: true, hint: 'Escolha a data e hora da demonstracao.' },
+  { label: 'Decisor identificado', status: 'decision_maker_identified', nextAction: 'call', tone: 'bg-fuchsia-600 hover:bg-fuchsia-500', autoDays: 1, hint: 'Regista o decisor e agenda nova chamada.' },
+  { label: 'Reagendar contacto', status: 'rescheduled', nextAction: 'call', tone: 'bg-amber-600 hover:bg-amber-500', needsReschedule: true, hint: 'Quando voltar a ligar?' },
+  { label: 'Enviar email', status: 'follow_up', nextAction: 'email', tone: 'bg-sky-600 hover:bg-sky-500', autoDays: 1, hint: 'Regista o follow-up e abre os modelos de mensagem.' },
+  { label: 'Pediu ligar depois', status: 'rescheduled', nextAction: 'call', tone: 'bg-yellow-600 hover:bg-yellow-500', needsReschedule: true, hint: 'Quando pediu para ligar?' },
+  { label: 'Contactado recepcao', status: 'contacted_reception', nextAction: 'call', tone: 'bg-violet-600 hover:bg-violet-500', autoDays: 2, hint: 'Atendeu a recepcao. Agenda nova tentativa para chegar ao decisor.' },
+  { label: 'Sem resposta', status: 'scheduled_contact', nextAction: 'call', tone: 'bg-slate-600 hover:bg-slate-500', autoDays: 1, hint: 'Regista a tentativa e volta a ligar.' },
   { label: 'Nao tem interesse', status: 'lost', nextAction: 'none', tone: 'bg-rose-700 hover:bg-rose-600', needsCloseReason: true },
   { label: 'Nao contactar mais', status: 'do_not_contact', nextAction: 'none', tone: 'bg-red-800 hover:bg-red-700', needsCloseReason: true }
 ];
+
+interface FinishOverride {
+  status: CommercialLeadStatus;
+  nextType: NextActionType;
+  nextAt?: string;
+  reasonId?: string;
+  /** Nao fecha o Play depois de gravar */
+  keepOpen?: boolean;
+}
 
 const fieldClass = 'w-full rounded-lg border border-gray-300 bg-white p-2.5 text-xs text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none shadow-sm';
 
@@ -527,6 +540,8 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
 
+  const [quickDialog, setQuickDialog] = useState<{ button: (typeof statusButtons)[number]; at: string; reasonId: string } | null>(null);
+
   const closedStatuses: CommercialLeadStatus[] = ['lost', 'do_not_contact'];
   const needsCloseReason = closedStatuses.includes(pendingStatus);
 
@@ -660,31 +675,68 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     onClose();
   };
 
-  const handleFinish = async () => {
-    if (needsCloseReason && !closeReasonId) {
+  // Botoes de resultado (rodape): abrem uma confirmacao e gravam logo
+  const handleQuickAction = (b: (typeof statusButtons)[number]) => {
+    applyQuickStatus(b);
+    setQuickDialog({
+      button: b,
+      at: b.nextAction === 'none' ? '' : plusDays(b.autoDays ?? (b.status === 'demo_scheduled' ? 1 : 2)),
+      reasonId: ''
+    });
+  };
+
+  const confirmQuickAction = async () => {
+    if (!quickDialog) return;
+    const { button, at, reasonId } = quickDialog;
+    const closing = closedStatuses.includes(button.status);
+    if (closing && !reasonId) {
+      alert('Escolha um motivo de encerramento.');
+      return;
+    }
+    if (button.nextAction !== 'none' && !at) {
+      alert('Indique a data e hora da proxima accao.');
+      return;
+    }
+    const keepOpen = button.nextAction === 'email';
+    setQuickDialog(null);
+    setCloseReasonId(reasonId);
+    setNextActionAt(at);
+    await handleFinish({ status: button.status, nextType: button.nextAction, nextAt: at || undefined, reasonId, keepOpen });
+    // "Enviar email": abre os templates depois de registar
+    if (keepOpen && onOpenMessages) onOpenMessages();
+  };
+
+  const handleFinish = async (o?: FinishOverride) => {
+    const status = o?.status ?? pendingStatus;
+    const nextType = o?.nextType ?? nextActionType;
+    const nextAt = o ? o.nextAt : nextActionAt;
+    const reasonId = o?.reasonId ?? closeReasonId;
+    const closing = closedStatuses.includes(status);
+
+    if (closing && !reasonId) {
       alert('Escolha um motivo de encerramento antes de guardar.');
       return;
     }
     setSaving(true);
     try {
-      const reason = closeReasons.find((r) => r.id === closeReasonId);
-      const finalNextAt = pendingStatus === 'do_not_contact' || pendingStatus === 'lost'
+      const reason = closeReasons.find((r) => r.id === reasonId);
+      const finalNextAt = status === 'do_not_contact' || status === 'lost'
         ? undefined
-        : (nextActionAt ? new Date(nextActionAt).toISOString() : undefined);
+        : (nextAt ? new Date(nextAt).toISOString() : undefined);
 
       // 1) Atualiza o lead
       const updatedLead: Lead = {
         ...lead,
-        commercialStatus: pendingStatus,
+        commercialStatus: status,
         leadScore: aiScore ?? lead.leadScore,
         contactPerson: decisionName.trim() || lead.contactPerson,
-        nextActionType: finalNextAt ? nextActionType : 'none',
+        nextActionType: finalNextAt ? nextType : 'none',
         nextActionAt: finalNextAt,
         callbackScheduledAt: finalNextAt,
         callbackStatus: finalNextAt ? 'pending' : 'completed',
-        closeReasonId: needsCloseReason ? closeReasonId : undefined,
-        closeNotes: needsCloseReason ? (reason?.name || '') : lead.closeNotes,
-        doNotContact: pendingStatus === 'do_not_contact',
+        closeReasonId: closing ? reasonId : undefined,
+        closeNotes: closing ? (reason?.name || '') : lead.closeNotes,
+        doNotContact: status === 'do_not_contact',
         contactNotes: notes.trim() || lead.contactNotes,
         lastActivityAt: new Date().toISOString()
       };
@@ -696,11 +748,11 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         leadId: lead.id,
         sellerId: lead.responsibleSellerId,
         activityType: 'call',
-        outcome: statusButtons.find((b) => b.status === pendingStatus)?.label || pendingStatus,
+        outcome: statusButtons.find((b) => b.status === status)?.label || status,
         notes: notes.trim() || undefined,
         objections: selectedObjections.length ? selectedObjections : undefined,
         interestLevel: interest,
-        nextActionType: finalNextAt ? nextActionType : 'none',
+        nextActionType: finalNextAt ? nextType : 'none',
         nextActionAt: finalNextAt,
         createdAt: new Date().toISOString()
       };
@@ -727,7 +779,13 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
       }
 
       onSaved();
-      onClose();
+      if (o?.keepOpen) {
+        // continua no Play (ex.: a abrir os templates de email): limpa as notas ja registadas
+        setNotes('');
+        finishedRef.current = false;
+      } else {
+        onClose();
+      }
     } catch (err: any) {
       console.error('Erro ao concluir Play:', err);
       alert('Nao foi possivel guardar o resultado da chamada.');
@@ -1263,7 +1321,8 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           {statusButtons.map((b) => (
             <button
               key={b.label}
-              onClick={() => applyQuickStatus(b)}
+              onClick={() => handleQuickAction(b)}
+              title={b.hint}
               className={`rounded-lg px-3 py-2 text-[11px] font-bold text-white transition ${pendingStatus === b.status ? `${b.tone} ring-2 ring-gray-400/40` : b.tone}`}
             >
               {b.label}
@@ -1279,7 +1338,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           <div className="ml-auto flex items-center gap-3">
             <span className="text-[11px] text-gray-500">Estado final: <span className="font-bold text-gray-800">{statusButtons.find((b) => b.status === pendingStatus)?.label || pendingStatus}</span></span>
             <button
-              onClick={handleFinish}
+              onClick={() => handleFinish()}
               disabled={saving}
               className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:opacity-60"
             >
@@ -1289,6 +1348,44 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           </div>
         </div>
       </footer>
+
+      {/* CONFIRMACAO DO BOTAO DE RESULTADO */}
+      {quickDialog && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30 p-4" onClick={() => setQuickDialog(null)}>
+          <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-gray-900">{quickDialog.button.label}</h3>
+            {quickDialog.button.hint && <p className="mt-1 text-[11px] text-gray-500">{quickDialog.button.hint}</p>}
+
+            {closedStatuses.includes(quickDialog.button.status) && (
+              <div className="mt-3">
+                <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-rose-600"><ShieldOff className="h-3 w-3" /> Motivo de encerramento *</span>
+                <select value={quickDialog.reasonId} onChange={(e) => setQuickDialog({ ...quickDialog, reasonId: e.target.value })} className={fieldClass}>
+                  <option value="">Escolher motivo</option>
+                  {closeReasons.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {quickDialog.button.nextAction !== 'none' && (
+              <div className="mt-3">
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">Proxima accao</span>
+                <input type="datetime-local" value={quickDialog.at} onChange={(e) => setQuickDialog({ ...quickDialog, at: e.target.value })} className={`${fieldClass} font-mono`} />
+              </div>
+            )}
+
+            <p className="mt-3 text-[11px] text-gray-500">
+              {notes.trim() ? 'As notas da chamada serao gravadas no historico do lead.' : 'Sem notas escritas: so o resultado fica registado.'}
+            </p>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setQuickDialog(null)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
+              <button onClick={confirmQuickAction} disabled={saving} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-60">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />} Confirmar e guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HISTORICO COMERCIAL */}
       {showHistory && (
