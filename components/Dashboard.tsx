@@ -28,6 +28,7 @@ import { hotelDb } from '../services/hotelDb';
 import { crmDb } from '../services/crmDb';
 import { CrmSeller, CrmCloseReason } from '../types';
 import { SystemHealth } from './SystemHealth';
+import { SEGMENTS, CUSTOM_SEGMENT_ID, getSegment } from '../services/segments';
 
 const AGENTS = [
   { id: 0, name: 'Líder de Missão', role: 'Orquestrador', icon: 'orchestrator' },
@@ -93,8 +94,27 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   const [campaignName, setCampaignName] = useState('Hotéis Portugal - Housekeeping');
   const [country, setCountry] = useState('PT');
   const [location, setLocation] = useState('Lisboa, Porto, Algarve');
+  const [segmentId, setSegmentId] = useState<string>('hotelaria');
   const [niche, setNiche] = useState('Hotéis');
-  const [aiContext, setAiContext] = useState('Análise de reputação de limpeza e adequabilidade do Sistema de Governança'); 
+  const [aiContext, setAiContext] = useState('Análise de reputação de limpeza e adequabilidade do Sistema de Governança');
+
+  const currentSegment = getSegment(segmentId);
+
+  // Escolher um segmento preenche nicho e contexto (o vendedor pode editar depois)
+  const handleSelectSegment = (id: string) => {
+    setSegmentId(id);
+    const seg = getSegment(id);
+    if (!seg) {
+      setNiche('');
+      setAiContext('');
+      return;
+    }
+    setNiche(seg.searchTerm);
+    setAiContext(`Segmento: ${seg.label}. Adequação ao Workio: ${seg.painPoints.join('; ')}.`);
+    setCampaignName((prev) => (!prev.trim() || SEGMENTS.some((s) => prev.startsWith(s.searchTerm)) || prev.startsWith('Hotéis Portugal')
+      ? `${seg.searchTerm} ${COUNTRY_OPTIONS.find((o) => o.code === country)?.name || ''}`.trim()
+      : prev));
+  };
   const [leadLimit, setLeadLimit] = useState<number>(3); 
 
   const [stage, setStage] = useState<ProcessingStage>('idle');
@@ -383,7 +403,9 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
         ...getSeenLeads(seenKey)
       ].map((n) => (n || '').trim()).filter(Boolean)));
 
-      const rawLeads = await searchLeadsInLocation(country, location, niche, aiContext, campaignName, excludeNames);
+      const segmentToSend = segmentId === CUSTOM_SEGMENT_ID ? undefined : segmentId;
+      const rawLeads = (await searchLeadsInLocation(country, location, niche, aiContext, campaignName, excludeNames, segmentToSend))
+        .map((raw) => ({ ...raw, segmentId: segmentToSend }));
 
       // Memoriza tudo o que veio para nao repetir na proxima pesquisa
       if (rawLeads && rawLeads.length > 0) {
@@ -697,7 +719,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 onClick={() => setActiveTab('academy')}
                 className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'academy' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
             >
-                <GraduationCap className="w-4 h-4" /> Academia SOL
+                <GraduationCap className="w-4 h-4" /> Academia Workio
             </button>
 
             <button
@@ -770,13 +792,13 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-ai-dark shrink-0">
             <h1 className="font-bold text-white tracking-tight flex items-center gap-2">
-                {activeTab === 'dashboard' && 'Pesquisa e Análise de Hotéis'}
+                {activeTab === 'dashboard' && 'Nova Prospeção'}
                 {activeTab === 'database' && 'Base de Dados de Hotéis & CRM'}
                 {activeTab === 'pipeline' && 'Pipeline Comercial'}
                 {activeTab === 'planner' && 'Planeador Comercial Semanal'}
                 {activeTab === 'followup' && 'Follow-up e Reagendamentos'}
                 {activeTab === 'tools' && 'Ferramentas de Venda'}
-                {activeTab === 'academy' && 'Academia SOL'}
+                {activeTab === 'academy' && 'Academia Workio'}
                 {activeTab === 'email' && 'Caixa de Email'}
                 {activeTab === 'agenda' && 'Agenda para Voltar Contactos (Callbacks)'}
                 {activeTab === 'crm' && 'Dashboard de Vendas'}
@@ -833,6 +855,35 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                             />
                         </div>
 
+                        {/* Segmento de mercado */}
+                        <div className="mb-4">
+                            <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Segmento a prospetar</label>
+                            <div className="flex flex-wrap gap-2">
+                                {SEGMENTS.map((seg) => (
+                                    <button
+                                        key={seg.id}
+                                        type="button"
+                                        onClick={() => handleSelectSegment(seg.id)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${segmentId === seg.id ? 'bg-emerald-600/15 text-emerald-300 border-emerald-500/40' : 'bg-ai-dark text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'}`}
+                                    >
+                                        {seg.label}
+                                    </button>
+                                ))}
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectSegment(CUSTOM_SEGMENT_ID)}
+                                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${segmentId === CUSTOM_SEGMENT_ID ? 'bg-emerald-600/15 text-emerald-300 border-emerald-500/40' : 'bg-ai-dark text-gray-400 border-gray-700 hover:text-white hover:border-gray-500'}`}
+                                >
+                                    Outro (personalizado)
+                                </button>
+                            </div>
+                            {currentSegment && (
+                                <p className="mt-2 text-[11px] text-gray-500">
+                                    <span className="text-gray-400 font-bold">{currentSegment.product}</span> · Decisor: {currentSegment.contactRole} · {currentSegment.pitch}
+                                </p>
+                            )}
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                             <select
                                 value={country}
@@ -855,7 +906,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                             />
                             <input 
                                 value={niche} onChange={e => setNiche(e.target.value)}
-                                placeholder="Nicho (Opcional)"
+                                placeholder={segmentId === CUSTOM_SEGMENT_ID ? 'Escreva o nicho (ex.: Veterinários)' : 'Nicho (Opcional)'}
                                 className="bg-ai-dark border border-gray-700 rounded p-3 text-sm md:col-span-1"
                             />
                             

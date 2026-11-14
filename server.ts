@@ -7,6 +7,7 @@ import crypto from "crypto";
 import { GoogleGenAI } from "@google/genai";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
+import { getSegment, findSegmentByText, isHotelSegment } from "./services/segments";
 import {
   createSellerFolders,
   listFilesInFolder,
@@ -310,6 +311,10 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     if (normalized.includes("clinica")) return "clinic";
     if (normalized.includes("loja")) return "shop";
     if (normalized.includes("cafe") || normalized.includes("cafetaria")) return "cafe";
+
+    // Segmentos Workio (ginasios, oficinas, limpezas, ...)
+    const segment = findSegmentByText(value);
+    if (segment) return segment.osmTerm;
 
     return value || "business";
   };
@@ -654,12 +659,14 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   const buildBasicLead = (leadData: any) => {
     const id = crypto.randomUUID();
     const phone = leadData.phone || leadData.allPhones?.[0];
+    const segment = getSegment(leadData.segmentId) || findSegmentByText(leadData.niche);
+    const hotel = !segment || isHotelSegment(segment.id);
 
-    return {
+    const base = {
       id,
       companyName: leadData.companyName || "Unknown",
       location: leadData.location || "Portugal",
-      niche: leadData.niche || "Hotelaria",
+      niche: !hotel && segment ? segment.label : (leadData.niche || "Hotelaria"),
       website: leadData.website,
       email: leadData.email,
       phone,
@@ -715,6 +722,26 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       emailSequence: [],
       aiChatHistory: [],
       generatedSiteCode: null
+    };
+
+    if (hotel || !segment) return base;
+
+    // Outros segmentos: troca os textos especificos de hotelaria
+    return {
+      ...base,
+      businessActivity: leadData.businessActivity || segment.label,
+      servicesOffered: leadData.servicesOffered?.length ? leadData.servicesOffered : [segment.label],
+      contactPerson: leadData.responsibleName || segment.contactRole,
+      diagnosis: `Lead importado em modo gratuito (${segment.label}). Configure GEMINI_API_KEY para diagnóstico automático, reviews e proposta personalizada.`,
+      proposal: {
+        siteStructure: ["Aplicação móvel da equipa", "Painel do responsável", "Relatórios e histórico"],
+        brandingSuggestion: `Workio para ${segment.label}`,
+        techStack: "Web + App Mobile",
+        problems: segment.painPoints,
+        solutionFeatures: ["Tarefas e checklists no telemóvel", "Registo de ocorrências com foto", "Painel e relatórios em tempo real"],
+        expectedBenefits: ["Menos falhas de comunicação", "Mais controlo operacional", "Histórico e auditoria"],
+        estimatedValue: "A definir na proposta"
+      }
     };
   };
 
@@ -1279,7 +1306,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   // Route: searchLeads
   app.post('/api/gemini/searchLeads', async (req, res) => {
     try {
-      const { country, location, niche, aiContext, campaignName, excludeNames } = req.body;
+      const { country, location, niche, aiContext, campaignName, excludeNames, segmentId } = req.body;
+      const searchSegment = getSegment(segmentId);
 
       // Nomes ja conhecidos/mostrados/descartados: nunca devem voltar
       const excludedSet = new Set(
@@ -1324,7 +1352,10 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         searchIntent = `Find businesses related to: "${fallback}" in Portugal`;
       }
 
-      const extraContext = aiContext ? `Additional Context: ${aiContext}` : "";
+      const extraContext = [
+        aiContext ? `Additional Context: ${aiContext}` : "",
+        searchSegment ? `Target segment: ${searchSegment.label} (${searchSegment.aiHint}).` : ""
+      ].filter(Boolean).join("\n        ");
 
       // Lista de exclusao: empresas ja conhecidas que NAO devem voltar
       const excludeList = Array.from(excludedSet) as string[];
@@ -1384,6 +1415,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
           website: item.website || undefined,
           location: item.address || location || "Portugal",
           niche: niche || "General",
+          segmentId: searchSegment?.id,
           socials: [],
           allPhones: []
         }));
@@ -1693,7 +1725,54 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
 
       const ai = getGeminiClient();
 
-      const prompt = `
+      // Segmento Workio (por omissao: hotelaria, comportamento anterior)
+      const segment = getSegment(leadData.segmentId) || findSegmentByText(leadData.niche);
+      const isHotel = !segment || isHotelSegment(segment.id);
+
+      const segmentPrompt = segment && !isHotel ? `
+        AUDIT TARGET: "${leadData.companyName}" in "${leadData.location}".
+        URL: ${leadData.website || "No URL provided"}
+
+        LANGUAGE: STRICTLY EUROPEAN PORTUGUESE (pt-PT).
+
+        CONTEXT: We sell Workio, an operations platform for teams (tasks, checklists, shifts, maintenance tickets, reports).
+        TARGET SEGMENT: ${segment.label} (${segment.aiHint}).
+        TYPICAL PAINS IN THIS SEGMENT: ${segment.painPoints.join("; ")}.
+
+        TASK 1: BUSINESS AUDIT
+        - Confirm the business is real and active (use search/maps). If it is clearly not a "${segment.label}" business, set "valid" to false.
+        - Check reviews and website for signs of operational problems: delays, disorganisation, cleanliness, missed service, poor coordination.
+        - Estimate team size (${segment.unitLabel}) if possible.
+        - Infer the most likely decision maker role (e.g. ${segment.contactRole}). Do NOT invent a personal name unless found in a public source.
+
+        TASK 2: WORKIO FIT CLASSIFICATION
+        - **HOT**: visible operational pain, multiple locations/teams, or clear growth.
+        - **COLD**: very small, or evidence of strong existing processes/software.
+        - **MEDIUM**: otherwise.
+
+        OUTPUT JSON:
+        {
+          "valid": boolean,
+          "nif": "string",
+          "cae": "string",
+          "websiteScore": number,
+          "mapsRating": number,
+          "mapsReviews": number,
+          "openingHours": ["string"],
+          "services": ["string"],
+          "reviews": [{"author": "Name", "rating": 5, "text": "..."}],
+          "diagnosis": "string (pt-PT)",
+          "potential": "Hot" | "Medium" | "Cold",
+          "reasoning": "string (pt-PT) - why this business fits Workio, citing evidence",
+          "problems": ["string"],
+          "solutionFeatures": ["string"],
+          "expectedBenefits": ["string"],
+          "contactPerson": "string (role, e.g. ${segment.contactRole})",
+          "contactNotes": "string (pt-PT - size, positioning and suggested pitch for ${segment.label})"
+        }
+      ` : null;
+
+      const prompt = segmentPrompt || `
         AUDIT TARGET: "${leadData.companyName}" in "${leadData.location}".
         URL: ${leadData.website || "No URL provided"}
 
@@ -1748,7 +1827,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         id,
         companyName: leadData.companyName || "Unknown",
         location: leadData.location || "Unknown",
-        niche: leadData.niche || "Hotelaria",
+        niche: segment && !isHotel ? segment.label : (leadData.niche || "Hotelaria"),
         website: leadData.website,
         email: leadData.email,
         phone: primaryPhone,
@@ -1768,19 +1847,27 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         status: 'completed',
         potential: data.potential || 'Medium',
         potentialReasoning: data.reasoning || "Análise de limpeza e governança concluída.",
-        contactPerson: data.contactPerson || "Governanta-Geral",
-        contactNotes: data.contactNotes || "Hotel com potencial para modernização operacional do departamento de andares.",
+        contactPerson: data.contactPerson || (segment && !isHotel ? segment.contactRole : "Governanta-Geral"),
+        contactNotes: data.contactNotes || (segment && !isHotel ? `${segment.label}: ${segment.pitch}` : "Hotel com potencial para modernização operacional do departamento de andares."),
         callbackStatus: 'pending',
         storefront: {
           analyzed: true,
           signageCondition: 'Unknown',
           visualAppeal: 'Medium',
           needsLedUpgrade: false,
-          description: "Estrutura do hotel analisada remotamente via fotos de satélite e Maps.",
+          description: segment && !isHotel ? "Análise remota via Maps e website." : "Estrutura do hotel analisada remotamente via fotos de satélite e Maps.",
           address: leadData.location || "Portugal"
          },
-        diagnosis: data.diagnosis || "Pronto para contacto de apresentação do software de Housekeeping.",
-        proposal: {
+        diagnosis: data.diagnosis || (segment && !isHotel ? `Pronto para contacto de apresentação do Workio (${segment.label}).` : "Pronto para contacto de apresentação do software de Housekeeping."),
+        proposal: segment && !isHotel ? {
+          siteStructure: ["Aplicação móvel da equipa", "Painel do responsável", "Relatórios e histórico"],
+          brandingSuggestion: `Workio para ${segment.label}`,
+          techStack: "Web + App Mobile",
+          problems: data.problems || segment.painPoints,
+          solutionFeatures: data.solutionFeatures || ["Tarefas e checklists no telemóvel", "Registo de ocorrências com foto", "Painel e relatórios em tempo real"],
+          expectedBenefits: data.expectedBenefits || ["Menos falhas de comunicação", "Mais controlo operacional", "Histórico e auditoria de tudo o que foi feito"],
+          estimatedValue: "A definir na proposta"
+        } : {
           siteStructure: ["Aplicação Móvel das Empregadas", "Painel Administrativo da Governanta", "Ecrã de Status da Receção"],
           brandingSuggestion: "Digitalização de Housekeeping",
           techStack: "React Native + Web Panel Dashboard",
