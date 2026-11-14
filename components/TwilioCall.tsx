@@ -159,8 +159,11 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
               <h3 className="text-sm font-bold text-gray-800">Extensão EMET (SIP/WebRTC)</h3>
               <button onClick={() => setShowCfg(false)}><X className="h-4 w-4 text-gray-500" /></button>
             </div>
-            {field('Servidor WSS', 'wssUrl', 'wss://pbx.emet.pt:8089/ws')}
-            {field('Domínio SIP', 'domain', 'pbx.emet.pt')}
+            {(!cfg.wssUrl || !cfg.domain) && (
+              <p className="rounded bg-amber-50 p-2 text-[11px] text-amber-700">
+                Servidor EMET não definido. Configure VITE_EMET_WSS_URL e VITE_EMET_DOMAIN no deploy.
+              </p>
+            )}
             {field('Extensão', 'extension', '101')}
             {field('Password da extensão', 'password', '••••••', 'password')}
             <label className="flex items-center gap-2 text-xs font-bold text-gray-700">

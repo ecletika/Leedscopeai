@@ -13,12 +13,17 @@ export interface EmetConfig {
 
 const KEY = 'emet_sip_config';
 
+// Dados fixos do PABX (sistema interno): definidos no build/deploy via variáveis de ambiente.
+const env = (import.meta as any).env || {};
+export const EMET_WSS_URL: string = env.VITE_EMET_WSS_URL || '';
+export const EMET_DOMAIN: string = env.VITE_EMET_DOMAIN || '';
+
 export function loadEmetConfig(): EmetConfig {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { enabled: false, wssUrl: '', domain: '', extension: '', password: '', ...JSON.parse(raw) };
+    if (raw) return { enabled: false, extension: '', password: '', ...JSON.parse(raw), wssUrl: EMET_WSS_URL, domain: EMET_DOMAIN };
   } catch { /* ignore */ }
-  return { enabled: false, wssUrl: '', domain: '', extension: '', password: '' };
+  return { enabled: false, wssUrl: EMET_WSS_URL, domain: EMET_DOMAIN, extension: '', password: '' };
 }
 
 export function saveEmetConfig(cfg: EmetConfig) {
