@@ -16,7 +16,7 @@ import {
   Wallet
 } from 'lucide-react';
 import { SEGMENTS } from '../services/segments';
-import { WORKIO_AREAS, WORKIO_MODULES, modulesByArea } from '../services/workioModules';
+import { WORKIO_AREAS, WORKIO_MODULES, WORKIO_PLANS, formatPlanPrice, modulesByArea } from '../services/workioModules';
 
 interface Lesson {
   title: string;
@@ -53,7 +53,16 @@ const WORKIO_LESSONS: Lesson[] = [
     ]
   },
   {
-    title: '3. Fluxo comercial no CRM',
+    title: '3. Planos e preços',
+    body: WORKIO_PLANS.map((p, i) =>
+      `${p.name} · ${formatPlanPrice(p.price)}${p.highlight ? ` (${p.highlight})` : ''}: ${i === 0 ? 'inclui' : 'tudo do plano anterior, mais'} ${p.ownModules.join(', ')}.`
+    ).concat([
+      'Os preços são por colaborador por mês. Cada plano inclui os módulos do plano anterior.',
+      'Regra prática: comece pelo plano que resolve a dor principal (ponto e escalas) e mostre o que o plano seguinte acrescenta.'
+    ])
+  },
+  {
+    title: '4. Fluxo comercial no CRM',
     body: [
       'Prospetar -> guardar no CRM -> Modo Play (chamada) -> registar resultado e próxima ação -> demo -> proposta -> contrato.',
       'Regra de ouro: nenhum lead contactado fica sem próximo passo e sem notas da chamada.',
@@ -61,7 +70,7 @@ const WORKIO_LESSONS: Lesson[] = [
     ]
   },
   {
-    title: '4. Como responder objeções comuns',
+    title: '5. Como responder objeções comuns',
     body: [
       'Nunca discuta. Concorde, faça uma pergunta e mostre valor.',
       '"Já usamos folhas de cálculo" -> "Perfeito, muitos começam assim. Quanto tempo o RH gasta a fechar o mês de ponto e horas?"',

@@ -52,10 +52,77 @@ export const WORKIO_MODULES: WorkioModule[] = [
   { code: 'M27', name: 'Canal de Denúncia', area: 'empresa', tag: 'Novo', description: 'Denúncias anónimas ou identificadas, cifradas, com os prazos da Lei 93/2021.', demo: 'Receção confirmada em 7 dias · resposta até 3 meses' },
   { code: 'M21', name: 'Copilot Workio', area: 'empresa', tag: 'IA', description: 'Pergunte em português e receba a resposta com os dados da empresa e a fonte de cada número.', demo: 'Pergunta: "quem falta hoje?" → 2 pessoas' },
   { code: 'M10', name: 'Comunicação Interna', area: 'empresa', description: 'Comunicados, conversas e chamadas de voz e vídeo, sem sair do Workio.', demo: 'Comunicado Horário de Natal · lido por 31 de 35' },
+  // Descricoes de M12, M23 e M26 inferidas a partir do nome: a confirmar pela equipa.
+  { code: 'M12', name: 'Multi-NIF', area: 'empresa', description: 'Várias empresas (NIF) do mesmo grupo geridas na mesma conta.', demo: 'A detalhar' },
+  { code: 'M23', name: 'Eventos Operacionais', area: 'empresa', description: 'Registo e acompanhamento de eventos operacionais da empresa.', demo: 'A detalhar' },
+  { code: 'M26', name: 'Documentação', area: 'empresa', description: 'Documentos da empresa e dos colaboradores num só sítio.', demo: 'A detalhar' },
   { code: 'M20', name: 'Inventário', area: 'empresa', tag: 'Novo', description: 'Computadores, telemóveis e licenças de software, com recibo de entrega assinado.', demo: 'INV-0012 · ThinkPad T14' }
 ];
 
-export const modulesByArea = (area: WorkioArea) => WORKIO_MODULES.filter((m) => m.area === area);
+export const modulesByArea = (area: WorkioArea) =>
+  WORKIO_MODULES.filter((m) => m.area === area).sort((a, b) => a.code.localeCompare(b.code));
+
+// ---------------------------------------------------------------------------
+// Planos Workio (preco por colaborador / mes). Cada plano inclui o anterior.
+// ---------------------------------------------------------------------------
+export interface WorkioPlan {
+  id: 'pessoas' | 'professional' | 'business' | 'universe';
+  name: string;
+  /** Preco por colaborador / mes, em euros */
+  price: number;
+  tagline: string;
+  /** Modulos acrescentados por este plano (alem dos do plano anterior) */
+  ownModules: string[];
+  highlight?: string;
+}
+
+export const WORKIO_PLANS: WorkioPlan[] = [
+  {
+    id: 'pessoas',
+    name: 'Workio Pessoas',
+    price: 3.9,
+    tagline: 'Gestão operacional de pessoas, horários e assiduidade. Para pequenas e médias empresas que querem digitalizar o dia a dia dos colaboradores.',
+    ownModules: ['M01', 'M03', 'M13', 'M18', 'M17', 'M14']
+  },
+  {
+    id: 'professional',
+    name: 'Workio Professional',
+    price: 6.9,
+    tagline: 'Gestão de pessoas e desenvolvimento de talento. Para profissionalizar o recrutamento, a formação e a avaliação.',
+    ownModules: ['M07', 'M08', 'M06', 'M16', 'M11']
+  },
+  {
+    id: 'business',
+    name: 'Workio Business',
+    price: 10.9,
+    tagline: 'Recursos Humanos e operações numa só plataforma. Para centralizar o administrativo, o financeiro, o operacional e o documental.',
+    ownModules: ['M04', 'M05', 'M15', 'M10', 'M23', 'M20', 'M09', 'M26', 'M27', 'M25', 'M02']
+  },
+  {
+    id: 'universe',
+    name: 'Workio Universe',
+    price: 14.9,
+    tagline: 'Todos os módulos, Multi-NIF e inteligência artificial. Para empresas e grupos que querem tudo centralizado e preparado para crescer.',
+    ownModules: ['M12', 'M21'],
+    highlight: 'Mais completo'
+  }
+];
+
+export const formatPlanPrice = (price: number) =>
+  `${price.toFixed(2).replace('.', ',')} € por colaborador / mês`;
+
+/** Modulos incluidos num plano (cumulativo). */
+export const planModuleCodes = (planId: WorkioPlan['id']): string[] => {
+  const idx = WORKIO_PLANS.findIndex((p) => p.id === planId);
+  return WORKIO_PLANS.slice(0, idx + 1).flatMap((p) => p.ownModules);
+};
+
+/** Plano mais baixo que inclui o modulo (undefined = ainda sem plano). */
+export const lowestPlanForModule = (code: string): WorkioPlan | undefined =>
+  WORKIO_PLANS.find((p) => planModuleCodes(p.id).includes(code));
+
+/** Modulos do catalogo que ainda nao estao em nenhum plano. */
+export const unassignedModules = () => WORKIO_MODULES.filter((m) => !lowestPlanForModule(m.code));
 
 /** Resumo curto para prompts de IA. */
 export const WORKIO_PRODUCT_SUMMARY =

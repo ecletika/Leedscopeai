@@ -21,6 +21,7 @@ import SalesTools from './SalesTools';
 import ProposalBuilder from './ProposalBuilder';
 import ThemeToggle from './ThemeToggle';
 import Academy from './Academy';
+import WorkioCatalog from './WorkioCatalog';
 import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, CalendarClock, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, Users, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot, BarChart3, KanbanSquare, BookOpen, RotateCcw, Lightbulb, GraduationCap, FileSignature } from 'lucide-react';
 import { searchLeadsInLocation, analyzeAndGenerateProposal, generateOutreachEmail, runStorefrontInvestigation, generateCommercialProposal, askLeadQuestion, generateWebsiteCode, refineWebsiteCode } from '../services/geminiService';
 import { hotelDb } from '../services/hotelDb';
@@ -1306,10 +1307,13 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                         </div>
                     </div>
 
+                    {/* Modulos e planos Workio (M01..M27) */}
+                    <WorkioCatalog />
+
                     {/* Plan Management */}
                     <div className="bg-ai-card border border-gray-800 rounded-xl p-6">
                         <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                            <CreditCard className="text-ai-accent" /> Gestor de Planos
+                            <CreditCard className="text-ai-accent" /> Planos de utilizador (créditos de prospeção)
                         </h2>
                         
                         {/* New Plan Input */}

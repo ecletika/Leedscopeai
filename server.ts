@@ -741,7 +741,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         problems: segment.painPoints,
         solutionFeatures: ["Controlo de ponto no telemóvel (QR, rosto ou digital)", "Escalas gráficas e banco de horas automático", "Férias, ausências e relatórios sem folhas de cálculo"],
         expectedBenefits: ["Menos tempo de RH em tarefas manuais", "Faltas e atrasos visíveis no próprio dia", "Dados prontos para o processamento salarial"],
-        estimatedValue: "A definir na proposta"
+        estimatedValue: "Desde 3,90 € por colaborador / mês"
       }
     };
   };
@@ -1868,7 +1868,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
           problems: data.problems || segment.painPoints,
           solutionFeatures: data.solutionFeatures || ["Controlo de ponto no telemóvel (QR, rosto ou digital)", "Escalas gráficas e banco de horas automático", "Férias, ausências e relatórios sem folhas de cálculo"],
           expectedBenefits: data.expectedBenefits || ["Menos tempo de RH em tarefas manuais", "Faltas e atrasos visíveis no próprio dia", "Dados prontos para o processamento salarial"],
-          estimatedValue: "A definir na proposta"
+          estimatedValue: "Desde 3,90 € por colaborador / mês"
         } : {
           siteStructure: ["Aplicação Móvel das Empregadas", "Painel Administrativo da Governanta", "Ecrã de Status da Receção"],
           brandingSuggestion: "Digitalização de Housekeeping",
