@@ -15,11 +15,14 @@
               mono: ['JetBrains Mono', 'monospace'],
             },
             colors: {
+              // Cores Workio/Ecletika: o antigo verde (emerald/teal) passa a ser o azul Workio.
+              emerald: { 50: '#EFF6FC', 100: '#DCEBFA', 200: '#CCE4F7', 300: '#8CC4F5', 400: '#60AAFF', 500: '#1084DB', 600: '#0078D4', 700: '#005A9E', 800: '#004578', 900: '#003358', 950: '#00213A' },
+              teal: { 50: '#EFF6FC', 100: '#DCEBFA', 200: '#CCE4F7', 300: '#8CC4F5', 400: '#60AAFF', 500: '#1084DB', 600: '#0078D4', 700: '#005A9E', 800: '#004578', 900: '#003358', 950: '#00213A' },
               ai: {
                 dark: '#0f172a',
                 card: '#1e293b',
                 accent: '#3b82f6',
-                success: '#10b981',
+                success: '#0078D4',
                 warning: '#f59e0b',
                 danger: '#ef4444',
                 text: '#e2e8f0',
@@ -42,9 +45,9 @@
       ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
       ::-webkit-scrollbar-thumb:hover { background: #64748b; }
 
-      /* Sidebar com a cor da marca SOL (emerald/teal) */
-      .sol-sidebar { background: linear-gradient(180deg, #062c25 0%, #0b1f2a 55%, #0f172a 100%) !important; }
-      html.theme-light .sol-sidebar { background: linear-gradient(180deg, #ecfdf5 0%, #f0fdfa 55%, #f8fafc 100%) !important; }
+      /* Sidebar com as cores Workio (azul-marinho) */
+      .sol-sidebar { background: linear-gradient(180deg, #0a2340 0%, #0d1b33 55%, #0f172a 100%) !important; }
+      html.theme-light .sol-sidebar { background: linear-gradient(180deg, #e8f3fc 0%, #eff6fc 55%, #f8fafc 100%) !important; }
 
       /* =====================================================================
          TEMA CLARO — ativo apenas quando <html class="theme-light">.
@@ -77,7 +80,7 @@
       html.theme-light .text-gray-700 { color: #94a3b8 !important; }
 
       /* acentos com mais contraste no branco */
-      html.theme-light .text-emerald-300, html.theme-light .text-emerald-400 { color: #059669 !important; }
+      html.theme-light .text-emerald-300, html.theme-light .text-emerald-400, html.theme-light .text-emerald-500 { color: #0078D4 !important; }
       html.theme-light .text-green-300 { color: #16a34a !important; }
       html.theme-light .text-sky-300 { color: #0284c7 !important; }
       html.theme-light .text-blue-300 { color: #2563eb !important; }

@@ -52,10 +52,10 @@ export const WORKIO_MODULES: WorkioModule[] = [
   { code: 'M27', name: 'Canal de Denúncia', area: 'empresa', tag: 'Novo', description: 'Denúncias anónimas ou identificadas, cifradas, com os prazos da Lei 93/2021.', demo: 'Receção confirmada em 7 dias · resposta até 3 meses' },
   { code: 'M21', name: 'Copilot Workio', area: 'empresa', tag: 'IA', description: 'Pergunte em português e receba a resposta com os dados da empresa e a fonte de cada número.', demo: 'Pergunta: "quem falta hoje?" → 2 pessoas' },
   { code: 'M10', name: 'Comunicação Interna', area: 'empresa', description: 'Comunicados, conversas e chamadas de voz e vídeo, sem sair do Workio.', demo: 'Comunicado Horário de Natal · lido por 31 de 35' },
-  // Descricoes de M12, M23 e M26 inferidas a partir do nome: a confirmar pela equipa.
-  { code: 'M12', name: 'Multi-NIF', area: 'empresa', description: 'Várias empresas (NIF) do mesmo grupo geridas na mesma conta.', demo: 'A detalhar' },
-  { code: 'M23', name: 'Eventos Operacionais', area: 'empresa', description: 'Registo e acompanhamento de eventos operacionais da empresa.', demo: 'A detalhar' },
-  { code: 'M26', name: 'Documentação', area: 'empresa', description: 'Documentos da empresa e dos colaboradores num só sítio.', demo: 'A detalhar' },
+  // Textos de M12, M23 e M26 tirados da pagina de precos do workio.pt.
+  { code: 'M12', name: 'Multi-NIF', area: 'empresa', description: 'Várias empresas do mesmo grupo numa só conta, cada uma com os seus dados e as suas licenças.', demo: 'Grupo Mar Azul · 3 NIF · empresa ativa Restauração' },
+  { code: 'M23', name: 'Eventos Operacionais', area: 'empresa', tag: 'Novo', description: 'Eventos com equipas e escalas próprias, do primeiro ao último turno.', demo: 'Feira de Braga · 12 pessoas · 3 turnos por dia' },
+  { code: 'M26', name: 'Documentação', area: 'empresa', description: 'O arquivo da empresa e de cada pessoa, com validades e PDF à mão.', demo: 'Contratos 35 · a expirar 2' },
   { code: 'M20', name: 'Inventário', area: 'empresa', tag: 'Novo', description: 'Computadores, telemóveis e licenças de software, com recibo de entrega assinado.', demo: 'INV-0012 · ThinkPad T14' }
 ];
 

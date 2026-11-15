@@ -1576,3 +1576,12 @@ Correcao:
 - `.env.local`: adicionado `EMAIL_COPY_TO=ecletikaportugal@gmail.com`.
 
 Acoes na Vercel: definir `EMAIL_COPY_TO` (para receber copia na Gmail) e confirmar autenticacao do dominio remetente no Brevo (SPF/DKIM) para deliverability/spam.
+
+### 2026-11-15 - Cores Workio/Ecletika e Academia Workio completa
+
+- Sai o verde: as paletas `emerald` e `teal` do Tailwind (configuradas em `index.html`) passam ao azul Workio (`#0078D4`, `#60AAFF` no escuro). Barra lateral em azul-marinho (claro: `#E8F3FC`), logótipo com o «W» do Workio (verde-água, rosa e amarelo), tema claro e gradiente da proposta acertados.
+- Academia Workio (`components/Academy.tsx`), mantendo os cursos por área, SOL e segmentos:
+  - «Workio · Visão geral» com 13 lições: produto, a lei (art. 202.º, banco de horas, descanso de 11h, 40h de formação, Lei 93/2021, Lei 102/2009, RGPD), picagem por QR/terminal, escalas e aprovações, os quatro planos, Integração de Salários (o Workio NÃO processa salários), Professional/Business, Universe, descoberta, objeções, demo de 30 minutos, fluxo no CRM e "o que nunca se diz". Cada lição liga ao manual do Workio (`app.workio.pt/manuais?m=...`).
+  - Nas lições por módulo: o plano em que o módulo entra e a ligação ao manual.
+  - Separadores novos: «Planos e simulador» (recomendador de plano e preço mensal/IVA/12 meses) e «Teste final» (12 perguntas, aprova com 10, conta para a certificação da Visão geral).
+- `services/workioModules.ts`: M12, M23 e M26 deixam de ter texto "a confirmar"; vêm da página de preços do workio.pt.

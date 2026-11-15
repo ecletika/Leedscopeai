@@ -39,7 +39,7 @@ export default function ProposalBuilder({ lead, onClose, onSaved }: ProposalBuil
 <style>
   *{box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
   body{margin:0;padding:40px;color:#1a2230}
-  .brand{font-size:30px;font-weight:900;background:linear-gradient(90deg,#10b981,#06b6d4);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .brand{font-size:30px;font-weight:900;background:linear-gradient(90deg,#0078D4,#60AAFF);-webkit-background-clip:text;background-clip:text;color:transparent}
   .muted{color:#64748b;font-size:12px}
   h1{font-size:20px;margin:24px 0 4px}
   .grid{display:flex;gap:16px;margin-top:16px}
