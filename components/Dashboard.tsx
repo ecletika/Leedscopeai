@@ -22,6 +22,7 @@ import SalesTools from './SalesTools';
 import ProposalBuilder from './ProposalBuilder';
 import ThemeToggle from './ThemeToggle';
 import Academy from './Academy';
+import AcademyWorkio from './AcademyWorkio';
 import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, CalendarClock, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, Users, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot, BarChart3, KanbanSquare, BookOpen, RotateCcw, Lightbulb, GraduationCap, FileSignature } from 'lucide-react';
 import { searchLeadsInLocation, analyzeAndGenerateProposal, generateOutreachEmail, runStorefrontInvestigation, generateCommercialProposal, askLeadQuestion, generateWebsiteCode, refineWebsiteCode } from '../services/geminiService';
 import { hotelDb } from '../services/hotelDb';
@@ -71,7 +72,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'database' | 'pipeline' | 'planner' | 'followup' | 'tools' | 'academy' | 'agenda' | 'crm' | 'contracts' | 'sellers' | 'library' | 'history' | 'admin'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'database' | 'pipeline' | 'planner' | 'followup' | 'tools' | 'academy' | 'academyWorkio' | 'agenda' | 'crm' | 'contracts' | 'sellers' | 'library' | 'history' | 'admin'>('dashboard');
 
   // CRM Play mode overlay
   const [activeLeadForPlay, setActiveLeadForPlay] = useState<Lead | null>(null);
@@ -701,6 +702,13 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             </button>
 
             <button
+                onClick={() => setActiveTab('academyWorkio')}
+                className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'academyWorkio' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
+            >
+                <GraduationCap className="w-4 h-4" /> Academia Workio
+            </button>
+
+            <button
                 onClick={() => setActiveTab('email')}
                 className={`w-full text-left px-4.5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-3 transition-all ${activeTab === 'email' ? 'bg-emerald-600/10 text-emerald-400 border border-emerald-500/20' : 'text-gray-400 hover:bg-gray-800/40 hover:text-white border border-transparent'}`}
             >
@@ -777,6 +785,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 {activeTab === 'followup' && 'Follow-up e Reagendamentos'}
                 {activeTab === 'tools' && 'Ferramentas de Venda'}
                 {activeTab === 'academy' && 'Academia SOL'}
+                {activeTab === 'academyWorkio' && 'Academia Workio'}
                 {activeTab === 'email' && 'Caixa de Email'}
                 {activeTab === 'agenda' && 'Agenda para Voltar Contactos (Callbacks)'}
                 {activeTab === 'crm' && 'Dashboard de Vendas'}
@@ -1012,6 +1021,13 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             {activeTab === 'academy' && (
                 <div className="space-y-6 animate-in fade-in duration-300 text-left">
                     <Academy />
+                </div>
+            )}
+
+            {/* --- ACADEMIA WORKIO --- */}
+            {activeTab === 'academyWorkio' && (
+                <div className="space-y-6 animate-in fade-in duration-300 text-left">
+                    <AcademyWorkio />
                 </div>
             )}
 

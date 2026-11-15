@@ -1576,3 +1576,15 @@ Correcao:
 - `.env.local`: adicionado `EMAIL_COPY_TO=ecletikaportugal@gmail.com`.
 
 Acoes na Vercel: definir `EMAIL_COPY_TO` (para receber copia na Gmail) e confirmar autenticacao do dominio remetente no Brevo (SPF/DKIM) para deliverability/spam.
+
+### 2026-11-15 - Academia Workio (M43, segundo produto)
+
+A Academia Comercial (M43) passa a ter uma segunda academia, para vender o Workio (RH e ponto, Ecletika), ao lado da Academia SOL.
+
+- `components/AcademyWorkio.tsx`: nova aba "Academia Workio" no menu, com quatro separadores:
+  - **Lições** (12): o que é o Workio, a lei (art. 202.º, banco de horas art. 208.º-B/IRCT, descanso de 11h, art. 131.º 40h de formação, Lei 93/2021, Lei 102/2009, RGPD), picagem por QR/terminal, escalas e aprovações, os quatro planos, Integração de Salários (o Workio NÃO processa salários), Professional/Business, Universe (Multi-NIF e Copilot), descoberta, objeções, demo de 30 minutos e "o que nunca se diz". Cada lição liga ao manual do Workio (`app.workio.pt/manuais?m=...`).
+  - **Módulos**: os 27 módulos agrupados pelo plano em que entram, com o que cada um resolve e ligação ao manual.
+  - **Planos e simulador**: Pessoas 3,90 €, Professional 6,90 €, Business 10,90 €, Universe 14,90 € (por colaborador ativo/mês, sem IVA); recomendador de plano a partir das necessidades do cliente; simulador de preço (mensal, com IVA, 12 meses).
+  - **Teste final**: 12 perguntas, aprovação com 10.
+- Certificação "Vendedor aprovado para vender Workio": 12 lições lidas + teste aprovado + 4 itens de prática. Progresso em localStorage (`leadscope_academy_workio_v1`), como a Academia SOL.
+- Fonte do conteúdo (manter em linha quando mudar no Workio): `src/lib/modulos/catalogo.ts` (planos e módulos), `landing/pagina.html` (preços, perguntas frequentes, serviços) e `public/manuais/*.md` (funcionamento) do repositório ecletika/workio.
