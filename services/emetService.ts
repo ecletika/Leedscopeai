@@ -13,12 +13,54 @@ export interface EmetConfig {
 
 const KEY = 'emet_sip_config';
 
+// Dados fixos do PABX (sistema interno): definidos no build/deploy via variáveis de ambiente.
+const env = (import.meta as any).env || {};
+// Por omissão o PABX EMET de produção (não são segredos: endereço público com certificado válido).
+export const EMET_WSS_URL: string = env.VITE_EMET_WSS_URL || 'wss://sip.workio.pt/asterisk/ws';
+export const EMET_DOMAIN: string = env.VITE_EMET_DOMAIN || 'sip.workio.pt';
+
+// No MikoPBX cada ramal tem dois endpoints: "<ramal>" (SIP normal) e "<ramal>-WS" (WebRTC).
+// O browser tem de registar no "-WS"; no normal o PABX recusa o áudio WebRTC ("Incompatible SDP" / 488).
+// A autenticação continua a usar o número do ramal sem o sufixo.
+const baseExt = (ext: string) => String(ext || '').trim().replace(/-ws$/i, '');
+
+// O trunk só fala G.711: oferecer só PCMA/PCMU (+ DTMF) evita que o PABX converta o áudio de cada chamada.
+function g711Only(sdp: string): string {
+  try {
+    const lines = sdp.split('\r\n');
+    const mi = lines.findIndex((l) => l.startsWith('m=audio'));
+    if (mi < 0) return sdp;
+    const names: Record<string, string> = {};
+    lines.forEach((l) => { const m = /^a=rtpmap:(\d+) ([^/]+)/.exec(l); if (m) names[m[1]] = m[2]; });
+    const rank = (pt: string) => ({ PCMA: 0, PCMU: 1, 'telephone-event': 2 } as Record<string, number>)[names[pt] ?? ({ '0': 'PCMU', '8': 'PCMA' } as Record<string, string>)[pt]] ?? 99;
+    const head = lines[mi].split(' ');
+    const keep = head.slice(3).filter((pt) => rank(pt) < 99).sort((a, b) => rank(a) - rank(b));
+    if (!keep.some((pt) => rank(pt) < 2)) return sdp;
+    lines[mi] = [...head.slice(0, 3), ...keep].join(' ');
+    return lines.filter((l) => { const m = /^a=(?:rtpmap|fmtp|rtcp-fb):(\d+)/.exec(l); return !m || keep.includes(m[1]); }).join('\r\n');
+  } catch { return sdp; }
+}
+
+const SIP_CAUSES: Record<string, string> = {
+  'Authentication Error': 'Extensão ou password errada',
+  'Rejected': 'Recusada pelo PABX',
+  'Busy': 'Número ocupado',
+  'Not Found': 'Número não existe',
+  'Unavailable': 'Indisponível',
+  'Incompatible SDP': 'Áudio incompatível (a extensão tem de ser a WebRTC)',
+  'Connection Error': 'Sem ligação ao PABX',
+  'Request Timeout': 'O PABX não respondeu',
+  'Canceled': 'Cancelada',
+  'No Answer': 'Sem resposta',
+};
+const explain = (cause: string) => (SIP_CAUSES[cause] ? `${SIP_CAUSES[cause]} (${cause})` : cause || 'erro');
+
 export function loadEmetConfig(): EmetConfig {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { enabled: false, wssUrl: '', domain: '', extension: '', password: '', ...JSON.parse(raw) };
+    if (raw) return { enabled: false, extension: '', password: '', ...JSON.parse(raw), wssUrl: EMET_WSS_URL, domain: EMET_DOMAIN };
   } catch { /* ignore */ }
-  return { enabled: false, wssUrl: '', domain: '', extension: '', password: '' };
+  return { enabled: false, wssUrl: EMET_WSS_URL, domain: EMET_DOMAIN, extension: '', password: '' };
 }
 
 export function saveEmetConfig(cfg: EmetConfig) {
@@ -41,12 +83,16 @@ async function getUA(cfg: EmetConfig): Promise<JsSIP.UA> {
   destroyEmetUA();
 
   const socket = new JS.WebSocketInterface(cfg.wssUrl);
+  const ext = baseExt(cfg.extension);
   const agent: JsSIP.UA = new JS.UA({
     sockets: [socket],
-    uri: `sip:${cfg.extension}@${cfg.domain}`,
+    uri: `sip:${ext}-WS@${cfg.domain}`,
+    authorization_user: ext,
     password: cfg.password,
-    display_name: cfg.displayName || cfg.extension,
+    display_name: cfg.displayName || ext,
     register: true,
+    register_expires: 300,
+    session_timers: false,
   });
   ua = agent;
   uaKey = key;
@@ -54,7 +100,7 @@ async function getUA(cfg: EmetConfig): Promise<JsSIP.UA> {
   await new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Tempo esgotado a registar a extensão EMET.')), 12000);
     agent.once('registered', () => { clearTimeout(timer); resolve(); });
-    agent.once('registrationFailed', (e: any) => { clearTimeout(timer); reject(new Error('Registo EMET falhou: ' + (e?.cause || 'credenciais/servidor inválidos'))); });
+    agent.once('registrationFailed', (e: any) => { clearTimeout(timer); reject(new Error('Registo EMET falhou: ' + explain(e?.cause || 'credenciais/servidor inválidos'))); });
     agent.once('disconnected', (e: any) => { if (!agent.isRegistered()) { clearTimeout(timer); reject(new Error('Sem ligação ao servidor EMET (' + cfg.wssUrl + ').')); } });
     agent.start();
   });
@@ -92,6 +138,16 @@ export async function startEmetCall(
     pcConfig: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
   });
 
+  // Só G.711 na oferta (sem conversão de áudio no PABX).
+  session.on('sdp', (e: any) => { if (e.originator === 'local' && e.sdp) e.sdp = g711Only(e.sdp); });
+  // Não esperar que o STUN acabe de recolher candidatos (podia atrasar o início da chamada vários segundos):
+  // segue com o primeiro candidato público ou ao fim de 1 s.
+  let iceTimer: ReturnType<typeof setTimeout> | null = null;
+  session.on('icecandidate', (e: any) => {
+    if (e.candidate?.type === 'srflx') { if (iceTimer) clearTimeout(iceTimer); e.ready(); return; }
+    if (!iceTimer) iceTimer = setTimeout(() => e.ready(), 1000);
+  });
+
   session.on('peerconnection', (e: any) => {
     e.peerconnection.addEventListener('track', (ev: RTCTrackEvent) => {
       audio.srcObject = ev.streams[0];
@@ -102,7 +158,7 @@ export async function startEmetCall(
   session.on('ended', () => { audio.srcObject = null; cb.onEnded(); });
   session.on('failed', (e: any) => {
     audio.srcObject = null;
-    cb.onError('Chamada EMET falhou: ' + (e?.cause || 'erro'));
+    cb.onError('Chamada EMET falhou: ' + explain(e?.cause));
   });
 
   return {
