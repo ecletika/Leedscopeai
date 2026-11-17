@@ -4,6 +4,8 @@ import path from "path";
 import cors from "cors";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
+import dns from "dns";
+import net from "net";
 import { GoogleGenAI } from "@google/genai";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
@@ -691,12 +693,12 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       status: "completed",
       potential: "Medium",
       potentialReasoning: leadData.potentialReasoning || "Lead encontrado por pesquisa gratuita em fonte aberta. A classificação detalhada requer IA configurada.",
-      contactPerson: leadData.responsibleName || "Diretor de Operações / Governanta-Geral",
-      contactNotes: leadData.explorerName
+      contactPerson: leadData.responsibleName || undefined,
+      contactNotes: "Decisor provável (cargo): Diretor de Operações / Governanta-Geral. " + (leadData.explorerName
         ? `Entidade exploradora oficial: ${leadData.explorerName}${leadData.explorerTaxId ? ` (NIF ${leadData.explorerTaxId})` : ""}. Validar contacto antes da abordagem comercial.`
         : (leadData.cnpj
           ? `CADASTUR: ${leadData.legalName || leadData.companyName} (CNPJ ${leadData.cnpj}). ${leadData.responsibleName ? `Responsável: ${leadData.responsibleName}. ` : ""}${leadData.qsaAdministrators?.length ? `QSA/administradores: ${leadData.qsaAdministrators.join(", ")}. ` : ""}Validar contacto antes da abordagem comercial.`
-          : "Validar contacto por telefone ou website antes da abordagem comercial."),
+          : "Validar contacto por telefone ou website antes da abordagem comercial.")),
       callbackStatus: "pending",
       storefront: {
         analyzed: false,
@@ -732,7 +734,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       ...base,
       businessActivity: leadData.businessActivity || segment.label,
       servicesOffered: leadData.servicesOffered?.length ? leadData.servicesOffered : [segment.label],
-      contactPerson: leadData.responsibleName || segment.contactRole,
+      contactPerson: leadData.responsibleName || undefined,
+      contactNotes: String(base.contactNotes).replace("Diretor de Operações / Governanta-Geral", segment.contactRole),
       diagnosis: `Lead importado em modo gratuito (${segment.label}). Configure GEMINI_API_KEY para diagnóstico automático, reviews e proposta personalizada.`,
       proposal: {
         siteStructure: ["App do colaborador (ponto, férias, recibos)", "Painel de RH e chefias", "Relatórios automáticos"],
@@ -1769,7 +1772,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
           "problems": ["string"],
           "solutionFeatures": ["string"],
           "expectedBenefits": ["string"],
-          "contactPerson": "string (role, e.g. ${segment.contactRole})",
+          "contactPerson": "string - real full name ONLY if found in a public source, otherwise empty string",
+          "contactRole": "string - most likely decision-maker role, e.g. ${segment.contactRole}",
           "contactNotes": "string (pt-PT - size, positioning and suggested pitch for ${segment.label})"
         }
       ` : null;
@@ -1783,7 +1787,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         TASK 1: HOTEL/ACCOMMODATION OPERATION AUDIT
         - Analyze if the establishment possesses an active hotel/guesthouse operation.
         - Check reviews for mention of "limpeza" (cleanliness), "arrumação" (room tidy), "higiene" (hygiene), "tempo de espera para quarto" (wait time).
-        - Infer a specific and highly plausible Persona/Contact Person with a realistic generic Portuguese/Angolan Portuguese name (e.g., "Dra. Paula Albuquerque (Governanta-Geral)" or "Carlos Fernandes (Diretor de Alojamentos)") based on standard industry directories or corporate roles.
+        - Identify the most likely DECISION-MAKER ROLE (e.g. "Governanta-Geral", "Diretor de Alojamentos"). NEVER invent a personal name: give a full name only if it appears in a public source you actually found, otherwise leave it empty.
 
         TASK 2: HOUSEKEEPING PAIN INDEX & CLASSIFICATION
         - **HOT**: Bad reviews regarding cleanliness, slow check-in/turnaround, or large size showing clear logistics struggles.
@@ -1807,7 +1811,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
           "problems": ["string"],
           "solutionFeatures": ["string"],
           "expectedBenefits": ["string"],
-          "contactPerson": "string (realistic name + role, e.g. Maria Clara Sousa (Governanta-Geral))",
+          "contactPerson": "string - real full name ONLY if found in a public source, otherwise empty string",
+          "contactRole": "string - most likely decision-maker role, no personal name",
           "contactNotes": "string (pt-PT - summary of hotel size, positioning, and target pitch)"
         }
       `;
@@ -1849,8 +1854,10 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         status: 'completed',
         potential: data.potential || 'Medium',
         potentialReasoning: data.reasoning || "Análise de limpeza e governança concluída.",
-        contactPerson: data.contactPerson || (segment && !isHotel ? segment.contactRole : "Governanta-Geral"),
-        contactNotes: data.contactNotes || (segment && !isHotel ? `${segment.label}: ${segment.pitch}` : "Hotel com potencial para modernização operacional do departamento de andares."),
+        // Nunca um nome inventado: so um nome encontrado numa fonte publica; o cargo vai nas notas
+        contactPerson: (typeof data.contactPerson === "string" && data.contactPerson.trim()) || undefined,
+        contactNotes: `Decisor provável (cargo): ${data.contactRole || (segment && !isHotel ? segment.contactRole : "Governanta-Geral / Diretor de Operações")}. ` +
+          (data.contactNotes || (segment && !isHotel ? `${segment.label}: ${segment.pitch}` : "Hotel com potencial para modernização operacional do departamento de andares.")),
         callbackStatus: 'pending',
         storefront: {
           analyzed: true,
@@ -2228,6 +2235,221 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     } catch (err: any) {
       console.error('[Places] search error:', err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PESSOAS — procura em fontes PUBLICAS do website da empresa ─────────────
+  // Nunca inventa: so devolve nomes/cargos/emails que aparecem escritos nas paginas
+  // (e valida o que a IA extrai contra o texto real da pagina).
+  const isPrivateIp = (ip: string): boolean => {
+    if (net.isIPv4(ip)) {
+      const [a, b] = ip.split(".").map(Number);
+      return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    }
+    if (net.isIPv6(ip)) {
+      const v = ip.toLowerCase();
+      if (v === "::1" || v === "::") return true;
+      if (v.startsWith("fc") || v.startsWith("fd") || v.startsWith("fe80")) return true;
+      const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+      return mapped ? isPrivateIp(mapped[1]) : false;
+    }
+    return true;
+  };
+
+  const isPublicHost = async (hostname: string): Promise<boolean> => {
+    if (!hostname || hostname === "localhost" || hostname.endsWith(".local") || hostname.endsWith(".internal")) return false;
+    if (net.isIP(hostname)) return !isPrivateIp(hostname);
+    try {
+      const addrs = await dns.promises.lookup(hostname, { all: true });
+      return addrs.length > 0 && addrs.every((a) => !isPrivateIp(a.address));
+    } catch {
+      return false;
+    }
+  };
+
+  const PEOPLE_MAX_BYTES = 1_500_000;
+
+  // GET de uma pagina publica, com limites (tempo, tamanho, redirects, so portas 80/443)
+  const safeFetchHtml = async (startUrl: string): Promise<{ url: string; html: string } | null> => {
+    let current = startUrl;
+    for (let hop = 0; hop < 4; hop++) {
+      let u: URL;
+      try { u = new URL(current); } catch { return null; }
+      if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+      if (u.port && u.port !== "80" && u.port !== "443") return null;
+      if (!(await isPublicHost(u.hostname))) return null;
+
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      try {
+        const r = await fetch(u.toString(), {
+          redirect: "manual",
+          signal: ctrl.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; WorkioBot/1.0)", Accept: "text/html,application/xhtml+xml" }
+        });
+        if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+          current = new URL(r.headers.get("location") as string, u).toString();
+          continue;
+        }
+        if (!r.ok) return null;
+        if (!String(r.headers.get("content-type") || "").includes("html")) return null;
+        const buf = Buffer.from(await r.arrayBuffer());
+        return { url: u.toString(), html: buf.subarray(0, PEOPLE_MAX_BYTES).toString("utf8") };
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    return null;
+  };
+
+  const htmlToText = (html: string): string =>
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<(br|\/p|\/div|\/li|\/h\d|\/tr)[^>]*>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#64;|&commat;/g, "@")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n\s*\n+/g, "\n")
+      .trim();
+
+  const GENERIC_EMAIL_PREFIXES = ["info", "geral", "reservas", "reservations", "booking", "contacto", "contactos", "contact", "comercial", "sales", "recepcao", "receção", "reception", "administrativo", "hello", "ola", "olá", "suporte", "support", "marketing", "rh", "office", "mail", "geral"];
+
+  const extractEmails = (html: string, text: string): string[] => {
+    const found = new Set<string>();
+    const re = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+    for (const m of (html + " " + text).match(re) || []) {
+      const e = m.toLowerCase();
+      if (/\.(png|jpe?g|gif|svg|webp|css|js)$/.test(e)) continue;
+      if (/(example|sentry|wixpress|domain\.com|email\.com|yourdomain)/.test(e)) continue;
+      found.add(e);
+    }
+    return Array.from(found);
+  };
+
+  const extractPtPhones = (text: string): string[] => {
+    const found = new Set<string>();
+    const re = /(?:\+?351[\s.-]?)?(?:2\d[\s.-]?\d{3}[\s.-]?\d{4}|9[1236]\d[\s.-]?\d{3}[\s.-]?\d{3})/g;
+    for (const m of text.match(re) || []) {
+      const digits = m.replace(/\D/g, "").replace(/^351/, "");
+      if (digits.length === 9 && /^[29]/.test(digits)) found.add(`+351 ${digits}`);
+    }
+    return Array.from(found);
+  };
+
+  const PEOPLE_PAGE_PATHS = ["", "/equipa", "/a-equipa", "/a-nossa-equipa", "/team", "/sobre", "/sobre-nos", "/quem-somos", "/about", "/about-us", "/contactos", "/contacto", "/contact"];
+
+  // POST /api/people/find — { companyName, website }
+  app.post('/api/people/find', async (req, res) => {
+    try {
+      const { companyName, website } = req.body as { companyName?: string; website?: string };
+      if (!website || !String(website).trim()) {
+        return res.json({ people: [], emails: [], phones: [], pagesChecked: 0, notes: ["Este lead não tem website: não há página pública para analisar."] });
+      }
+
+      let base: URL;
+      try {
+        base = new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`);
+      } catch {
+        return res.status(400).json({ error: "Website inválido." });
+      }
+
+      const pages: { url: string; html: string; text: string }[] = [];
+      const seen = new Set<string>();
+      for (const p of PEOPLE_PAGE_PATHS) {
+        if (pages.length >= 6) break;
+        const target = new URL(p || "/", base).toString();
+        if (seen.has(target)) continue;
+        seen.add(target);
+        const got = await safeFetchHtml(target);
+        if (got && !pages.some((x) => x.url === got.url)) {
+          pages.push({ url: got.url, html: got.html, text: htmlToText(got.html).slice(0, 12000) });
+        }
+      }
+
+      const notes: string[] = [];
+      if (pages.length === 0) {
+        return res.json({ people: [], emails: [], phones: [], pagesChecked: 0, notes: ["Não foi possível abrir o website (indisponível ou bloqueado)."] });
+      }
+
+      const allText = pages.map((p) => p.text).join("\n");
+      const emailSet = new Map<string, string>();
+      const phoneSet = new Map<string, string>();
+      for (const p of pages) {
+        for (const e of extractEmails(p.html, p.text)) if (!emailSet.has(e)) emailSet.set(e, p.url);
+        for (const ph of extractPtPhones(p.text)) if (!phoneSet.has(ph)) phoneSet.set(ph, p.url);
+      }
+      const emails = Array.from(emailSet.entries()).map(([email, sourceUrl]) => {
+        const local = email.split("@")[0];
+        return { email, sourceUrl, kind: GENERIC_EMAIL_PREFIXES.includes(local) ? "generic" : "personal" };
+      });
+      const phones = Array.from(phoneSet.entries()).map(([phone, sourceUrl]) => ({ phone, sourceUrl }));
+
+      // Pessoas: so se houver IA; valida cada resultado contra o texto real
+      let people: any[] = [];
+      if (!process.env.GEMINI_API_KEY) {
+        notes.push("IA não configurada: só foram extraídos emails e telefones. Os nomes exigem GEMINI_API_KEY.");
+      } else {
+        try {
+          const ai = getGeminiClient();
+          const corpus = pages.map((p) => `### PÁGINA ${p.url}\n${p.text}`).join("\n\n").slice(0, 40000);
+          const prompt = `
+            Extrai APENAS pessoas que aparecem escritas, com nome próprio, nas páginas abaixo da empresa "${companyName || ""}".
+            REGRAS:
+            - NUNCA inventes, deduzas ou completes nomes, cargos ou emails. Se não está escrito, não incluas.
+            - Só pessoas associadas à empresa (equipa, direção, gerência, contactos). Ignora autores de reviews, clientes e figuras públicas.
+            - "evidence" é uma citação CURTA e literal do texto onde a pessoa aparece.
+            Devolve um ARRAY JSON (pode ser vazio): [{"name":"","role":"","email":"","phone":"","sourceUrl":"","evidence":""}]
+
+            ${corpus}
+          `;
+          const response = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: prompt,
+            config: { thinkingConfig: { thinkingBudget: 0 } }
+          });
+          const parsed = extractJson(response.text || "[]");
+          const hay = allText.toLowerCase();
+          const normalizedEmails = new Set(emails.map((e) => e.email));
+          if (Array.isArray(parsed)) {
+            const dedupe = new Set<string>();
+            for (const item of parsed) {
+              const name = String(item?.name || "").trim();
+              if (name.length < 5 || !name.includes(" ")) continue;
+              if (!hay.includes(name.toLowerCase())) continue; // nome tem de existir no texto
+              if (dedupe.has(name.toLowerCase())) continue;
+              dedupe.add(name.toLowerCase());
+              const role = String(item?.role || "").trim();
+              const roleOk = role && hay.includes(role.toLowerCase());
+              const email = String(item?.email || "").trim().toLowerCase();
+              people.push({
+                name,
+                role: roleOk ? role : undefined,
+                email: normalizedEmails.has(email) ? email : undefined,
+                phone: item?.phone && allText.includes(String(item.phone)) ? String(item.phone) : undefined,
+                source: "website",
+                sourceUrl: pages.some((p) => p.url === item?.sourceUrl) ? item.sourceUrl : pages[0].url,
+                confidence: roleOk ? "probable" : "unverified",
+                evidence: String(item?.evidence || "").slice(0, 240)
+              });
+              if (people.length >= 15) break;
+            }
+          }
+          if (people.length === 0) notes.push("Nenhuma pessoa com nome foi encontrada nas páginas públicas.");
+        } catch (err: any) {
+          console.warn("[People] extraction failed:", err?.message);
+          notes.push("A extração por IA falhou; só foram extraídos emails e telefones.");
+        }
+      }
+
+      res.json({ people, emails, phones, pagesChecked: pages.length, notes });
+    } catch (err: any) {
+      console.error("[People] find error:", err);
+      res.status(500).json({ error: err.message || "Erro ao procurar pessoas." });
     }
   });
 

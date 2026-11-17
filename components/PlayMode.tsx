@@ -20,6 +20,7 @@ import {
   Phone,
   Plus,
   Presentation,
+  Search,
   ShieldOff,
   Sparkles,
   Star,
@@ -43,6 +44,7 @@ import {
 import { crmDb } from '../services/crmDb';
 import { hotelDb } from '../services/hotelDb';
 import { getLeadPitch, buildWorkioScript, buildWorkioDemo, WORKIO_OBJECTIONS } from '../services/workioSales';
+import PeopleFinderModal from './PeopleFinderModal';
 import { destroyTwilioDevice } from '../services/twilioService';
 import { destroyEmetUA } from '../services/emetService';
 import { analyzeCallNotes } from '../services/geminiService';
@@ -548,6 +550,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
 
+  const [showPeopleFinder, setShowPeopleFinder] = useState(false);
   const [quickDialog, setQuickDialog] = useState<{ button: (typeof statusButtons)[number]; at: string; reasonId: string } | null>(null);
 
   const closedStatuses: CommercialLeadStatus[] = ['lost', 'do_not_contact'];
@@ -996,6 +999,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         {/* Strip de contactos compacto */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Contactos:</span>
+          <button onClick={() => setShowPeopleFinder(true)} className="flex items-center gap-1 rounded-full border border-sky-300 bg-sky-50 px-2.5 py-0.5 text-[11px] font-bold text-sky-700 transition hover:bg-sky-100">
+            <Search className="h-3 w-3" /> Encontrar pessoas
+          </button>
           {loading ? (
             <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />
           ) : contacts.length === 0 ? (
@@ -1371,6 +1377,18 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           </div>
         </div>
       </footer>
+
+      {/* ENCONTRAR PESSOAS */}
+      {showPeopleFinder && (
+        <PeopleFinderModal
+          lead={lead}
+          website={liveWebsite || lead.website}
+          targetRoles={isWorkio ? (workioSegment?.contactRole || 'Gerente / Responsável de RH') : 'Governanta-Geral / Diretor de Operações / Gerente'}
+          existingContacts={contacts}
+          onClose={() => setShowPeopleFinder(false)}
+          onChanged={() => { loadData(); }}
+        />
+      )}
 
       {/* CONFIRMACAO DO BOTAO DE RESULTADO */}
       {quickDialog && (
