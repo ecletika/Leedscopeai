@@ -29,6 +29,8 @@ import { crmDb } from '../services/crmDb';
 import { CrmSeller, CrmCloseReason } from '../types';
 import { SystemHealth } from './SystemHealth';
 import { SEGMENTS, CUSTOM_SEGMENT_ID, getSegment } from '../services/segments';
+import { searchApolloCompanies } from '../services/apolloService';
+import ApolloUsageBar from './ApolloUsageBar';
 
 const AGENTS = [
   { id: 0, name: 'Líder de Missão', role: 'Orquestrador', icon: 'orchestrator' },
@@ -111,6 +113,10 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   const [aiContext, setAiContext] = useState('Análise de reputação de limpeza e adequabilidade do Sistema de Governança');
 
   const currentSegment = getSegment(segmentId);
+
+  // Apollo: pesquisa de empresas opcional, com teto mensal de creditos
+  const [useApollo, setUseApollo] = useState(false);
+  const [apolloAvailable, setApolloAvailable] = useState(false);
 
   // Escolher um segmento preenche nicho e contexto (o vendedor pode editar depois)
   const handleSelectSegment = (id: string) => {
@@ -416,8 +422,22 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
       ].map((n) => (n || '').trim()).filter(Boolean)));
 
       const segmentToSend = segmentId === CUSTOM_SEGMENT_ID ? undefined : segmentId;
-      const rawLeads = (await searchLeadsInLocation(country, location, niche, aiContext, campaignName, excludeNames, segmentToSend))
-        .map((raw) => ({ ...raw, segmentId: segmentToSend }));
+      // Apollo (opcional, gasta creditos do teto mensal); se falhar ou vier vazio, usa a pesquisa normal
+      let found: Partial<Lead>[] | null = null;
+      if (useApollo && apolloAvailable) {
+        try {
+          updateAgent(1, 'working', 'A pesquisar empresas no Apollo...');
+          const apolloLeads = await searchApolloCompanies({ country, location, niche, segmentId: segmentToSend, excludeNames });
+          if (apolloLeads.length > 0) found = apolloLeads;
+          else updateAgent(1, 'working', 'Apollo sem resultados novos. A usar a pesquisa normal...');
+        } catch (apolloErr: any) {
+          updateAgent(1, 'working', `${apolloErr?.message || 'Apollo indisponível'} A usar a pesquisa normal...`);
+        }
+      }
+      if (!found) {
+        found = await searchLeadsInLocation(country, location, niche, aiContext, campaignName, excludeNames, segmentToSend);
+      }
+      const rawLeads = found.map((raw) => ({ ...raw, segmentId: segmentToSend }));
 
       // Memoriza tudo o que veio para nao repetir na proxima pesquisa
       if (rawLeads && rawLeads.length > 0) {
@@ -824,6 +844,20 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                                     <span className="text-gray-400 font-bold">{currentSegment.product}</span> · Decisor: {currentSegment.contactRole} · {currentSegment.pitch}
                                 </p>
                             )}
+                        </div>
+
+                        {/* Apollo: fonte opcional com teto mensal de creditos */}
+                        <div className="mb-4 rounded-lg border border-gray-800 bg-ai-dark p-3 space-y-2">
+                            <ApolloUsageBar tone="dark" onAvailability={setApolloAvailable} />
+                            <label className={`flex items-center gap-2 text-xs ${apolloAvailable ? 'text-gray-300' : 'text-gray-600'}`}>
+                                <input
+                                    type="checkbox"
+                                    checked={useApollo && apolloAvailable}
+                                    disabled={!apolloAvailable}
+                                    onChange={(e) => setUseApollo(e.target.checked)}
+                                />
+                                Procurar as empresas no Apollo (gasta créditos do teto mensal; se falhar ou não houver resultados, usa a pesquisa normal)
+                            </label>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">

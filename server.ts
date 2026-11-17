@@ -2453,5 +2453,219 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     }
   });
 
+  // ── APOLLO — empresas e pessoas, com teto mensal de creditos ───────────────
+  // A chave (CLIENT_API_APOLLO) vive so no servidor. Cada pedido reserva creditos no
+  // contador ANTES de chamar o Apollo; atingido o teto, nenhum pedido sai.
+  // NOTA: o contador e interno (o que ESTA app gastou); nao le o saldo real do Apollo.
+  const APOLLO_BASE = "https://api.apollo.io/api/v1";
+  const APOLLO_MONTHLY_LIMIT = 75;
+  const apolloKey = () => process.env.CLIENT_API_APOLLO?.trim();
+
+  async function getApolloUsage(): Promise<number | null> {
+    const admin = getSupabaseAdmin();
+    if (!admin) return null;
+    const { data, error } = await admin
+      .from('api_usage')
+      .select('count')
+      .eq('period', placesPeriod())
+      .eq('service', 'apollo')
+      .maybeSingle();
+    if (error) return null;
+    return data?.count ?? 0;
+  }
+
+  async function setApolloUsage(count: number): Promise<boolean> {
+    const admin = getSupabaseAdmin();
+    if (!admin) return false;
+    const { error } = await admin
+      .from('api_usage')
+      .upsert({ period: placesPeriod(), service: 'apollo', count: Math.max(0, count), updated_at: new Date().toISOString() }, { onConflict: 'period,service' });
+    return !error;
+  }
+
+  type ApolloGate = { ok: true; used: number } | { ok: false; status: number; error: string; used?: number };
+
+  // Reserva `cost` creditos. Falha fechada: sem contador, nao ha pedidos.
+  async function apolloReserve(cost: number): Promise<ApolloGate> {
+    if (!apolloKey()) return { ok: false, status: 503, error: "Apollo não configurado (falta a variável CLIENT_API_APOLLO)." };
+    const used = await getApolloUsage();
+    if (used === null) return { ok: false, status: 503, error: "Contador de créditos indisponível: pedidos ao Apollo bloqueados por segurança." };
+    if (used >= APOLLO_MONTHLY_LIMIT || used + cost > APOLLO_MONTHLY_LIMIT) {
+      return { ok: false, status: 429, used, error: `Limite mensal do Apollo atingido (${used}/${APOLLO_MONTHLY_LIMIT} créditos). Novos pedidos só no próximo mês.` };
+    }
+    if (cost > 0 && !(await setApolloUsage(used + cost))) {
+      return { ok: false, status: 503, error: "Não foi possível registar o consumo de créditos: pedido bloqueado." };
+    }
+    return { ok: true, used: used + cost };
+  }
+
+  // Chama o Apollo. Pedido falhado devolve os creditos reservados; se a resposta indicar
+  // `credits_consumed`, ajusta o contador ao valor real.
+  async function apolloCall(path: string, body: any, reservedCost: number): Promise<{ status: number; data: any; used: number }> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    let used = (await getApolloUsage()) ?? 0;
+    try {
+      const r = await fetch(`${APOLLO_BASE}${path}`, {
+        method: "POST",
+        signal: ctrl.signal,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "x-api-key": apolloKey() as string },
+        body: JSON.stringify(body)
+      });
+      const data: any = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (reservedCost > 0) { used = Math.max(0, used - reservedCost); await setApolloUsage(used); }
+      } else if (typeof data?.credits_consumed === "number" && data.credits_consumed !== reservedCost) {
+        used = Math.max(0, used + (data.credits_consumed - reservedCost));
+        await setApolloUsage(used);
+      }
+      return { status: r.status, data, used };
+    } catch (err) {
+      if (reservedCost > 0) { used = Math.max(0, used - reservedCost); await setApolloUsage(used); }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const apolloUsagePayload = (used: number) => ({
+    used,
+    limit: APOLLO_MONTHLY_LIMIT,
+    remaining: Math.max(APOLLO_MONTHLY_LIMIT - used, 0),
+    period: placesPeriod()
+  });
+
+  const apolloErrorMessage = (status: number, data: any) =>
+    status === 401 || status === 403 ? "Chave do Apollo recusada. Verifique a variável CLIENT_API_APOLLO."
+      : status === 429 ? "Apollo: limite de pedidos atingido. Tente mais tarde."
+      : `Erro do Apollo (${status})${data?.error ? `: ${String(data.error).slice(0, 120)}` : "."}`;
+
+  // GET /api/apollo/usage — estado da barra de creditos
+  app.get('/api/apollo/usage', async (_req, res) => {
+    const configured = Boolean(apolloKey());
+    const used = await getApolloUsage();
+    res.json({
+      configured,
+      counterAvailable: used !== null,
+      ...apolloUsagePayload(used ?? 0)
+    });
+  });
+
+  // POST /api/apollo/companies — pesquisa de empresas (conta 1 credito por pedido, por precaucao)
+  app.post('/api/apollo/companies', async (req, res) => {
+    try {
+      const { country, location, niche, segmentId, excludeNames } = req.body as any;
+      const gate = await apolloReserve(1);
+      if (!gate.ok) return res.status(gate.status).json({ error: gate.error, usage: gate.used !== undefined ? apolloUsagePayload(gate.used) : undefined });
+
+      const countryName = ({ PT: "Portugal", AO: "Angola", BR: "Brazil" } as Record<string, string>)[String(country || "PT").toUpperCase()] || "Portugal";
+      const places = splitLocations(String(location || ""), "", "").slice(0, 5);
+      const segment = getSegment(segmentId) || findSegmentByText(niche);
+      const keyword = segment?.osmTerm || String(niche || "").trim();
+
+      const body: any = {
+        organization_locations: (places.length ? places : [countryName]).map((p: string) => (p.toLowerCase().includes(countryName.toLowerCase()) ? p : `${p}, ${countryName}`)),
+        per_page: 10,
+        page: 1
+      };
+      if (keyword) body.q_organization_keyword_tags = [keyword];
+      // Workio e para empresas com equipa; o SOL (hotelaria) nao filtra por tamanho
+      if (segment && !isHotelSegment(segment.id)) body.organization_num_employees_ranges = ["11,50", "51,200", "201,500"];
+
+      const { status, data, used } = await apolloCall("/mixed_companies/search", body, 1);
+      if (status < 200 || status >= 300) return res.status(502).json({ error: apolloErrorMessage(status, data), usage: apolloUsagePayload(used) });
+
+      const excluded = new Set((Array.isArray(excludeNames) ? excludeNames : []).map((n: any) => String(n || "").trim().toLowerCase()));
+      const orgs: any[] = data.organizations || data.accounts || [];
+      const leads = orgs
+        .filter((o) => o?.name && !excluded.has(String(o.name).trim().toLowerCase()))
+        .map((o) => {
+          const phone = o.phone || o.primary_phone?.number || o.sanitized_phone || undefined;
+          return {
+            companyName: o.name,
+            website: o.website_url || (o.primary_domain ? `https://${o.primary_domain}` : undefined),
+            location: [o.street_address, o.city, o.state, o.country].filter(Boolean).join(", ") || countryName,
+            phone,
+            allPhones: phone ? [phone] : [],
+            niche: niche || segment?.searchTerm || "Empresas",
+            segmentId: segment?.id,
+            employees: o.estimated_num_employees ? `${o.estimated_num_employees} colaboradores (estimativa Apollo)` : undefined,
+            socials: [],
+            country: String(country || "PT").toUpperCase(),
+            dataSource: "Apollo"
+          };
+        });
+
+      res.json({ leads, usage: apolloUsagePayload(used) });
+    } catch (err: any) {
+      console.error("[Apollo] companies error:", err?.message);
+      res.status(500).json({ error: "Erro ao falar com o Apollo." });
+    }
+  });
+
+  // POST /api/apollo/people — decisores de uma empresa (pesquisa sem emails: 0 creditos segundo a doc)
+  app.post('/api/apollo/people', async (req, res) => {
+    try {
+      const { domain, titles } = req.body as { domain?: string; titles?: string[] };
+      const cleanDomain = String(domain || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      if (!cleanDomain) return res.status(400).json({ error: "Falta o domínio da empresa (website)." });
+
+      const gate = await apolloReserve(0);
+      if (!gate.ok) return res.status(gate.status).json({ error: gate.error, usage: gate.used !== undefined ? apolloUsagePayload(gate.used) : undefined });
+
+      const body: any = { q_organization_domains_list: [cleanDomain], per_page: 10, page: 1 };
+      if (Array.isArray(titles) && titles.length) body.person_titles = titles.slice(0, 12);
+
+      const { status, data, used } = await apolloCall("/mixed_people/api_search", body, 0);
+      if (status < 200 || status >= 300) return res.status(502).json({ error: apolloErrorMessage(status, data), usage: apolloUsagePayload(used) });
+
+      const people = ((data.people || data.contacts || []) as any[])
+        .filter((p) => p?.id)
+        .map((p) => ({
+          id: String(p.id),
+          name: [p.first_name, p.last_name || p.last_name_obfuscated].filter(Boolean).join(" ").trim() || "(nome oculto)",
+          title: p.title || undefined,
+          organization: p.organization?.name || undefined,
+          hasEmail: Boolean(p.has_email),
+          linkedinUrl: p.linkedin_url || undefined
+        }));
+
+      res.json({ people, usage: apolloUsagePayload(used) });
+    } catch (err: any) {
+      console.error("[Apollo] people error:", err?.message);
+      res.status(500).json({ error: "Erro ao falar com o Apollo." });
+    }
+  });
+
+  // POST /api/apollo/reveal — revela o email profissional de UMA pessoa (gasta creditos)
+  app.post('/api/apollo/reveal', async (req, res) => {
+    try {
+      const { personId } = req.body as { personId?: string };
+      if (!personId) return res.status(400).json({ error: "Falta a pessoa a revelar." });
+
+      const gate = await apolloReserve(1);
+      if (!gate.ok) return res.status(gate.status).json({ error: gate.error, usage: gate.used !== undefined ? apolloUsagePayload(gate.used) : undefined });
+
+      // Sem emails pessoais: so o contacto profissional
+      const { status, data, used } = await apolloCall("/people/match", { id: String(personId), reveal_personal_emails: false }, 1);
+      if (status < 200 || status >= 300) return res.status(502).json({ error: apolloErrorMessage(status, data), usage: apolloUsagePayload(used) });
+
+      const p = data.person || {};
+      res.json({
+        person: {
+          name: [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || undefined,
+          title: p.title || undefined,
+          email: p.email || undefined,
+          emailStatus: p.email_status || undefined,
+          linkedinUrl: p.linkedin_url || undefined
+        },
+        usage: apolloUsagePayload(used)
+      });
+    } catch (err: any) {
+      console.error("[Apollo] reveal error:", err?.message);
+      res.status(500).json({ error: "Erro ao falar com o Apollo." });
+    }
+  });
+
   return app;
 }

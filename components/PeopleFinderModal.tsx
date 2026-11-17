@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { ExternalLink, Linkedin, Loader2, Mail, Phone, Plus, Search, ShieldAlert, User, X } from 'lucide-react';
 import { CrmContact, Lead } from '../types';
 import { crmDb } from '../services/crmDb';
+import ApolloUsageBar from './ApolloUsageBar';
+import { ApolloPerson, apolloTitlesFor, findApolloPeople, revealApolloEmail } from '../services/apolloService';
 import {
   FoundPerson,
   PeopleSearchResult,
@@ -41,6 +43,45 @@ export default function PeopleFinderModal({ lead, website, targetRoles, existing
   const [mLinkedin, setMLinkedin] = useState('');
 
   const roles = splitRoles(targetRoles);
+
+  // Apollo: pesquisa de decisores (sem email) e revelacao de email por pessoa (gasta creditos)
+  const [apolloAvailable, setApolloAvailable] = useState(false);
+  const [apolloLoading, setApolloLoading] = useState(false);
+  const [apolloError, setApolloError] = useState('');
+  const [apolloPeople, setApolloPeople] = useState<ApolloPerson[] | null>(null);
+  const [revealingId, setRevealingId] = useState<string | null>(null);
+
+  const searchApollo = async () => {
+    if (!website) { setApolloError('Este lead não tem website: o Apollo precisa do domínio da empresa.'); return; }
+    setApolloLoading(true);
+    setApolloError('');
+    try {
+      setApolloPeople(await findApolloPeople(website, apolloTitlesFor(roles)));
+    } catch (e: any) {
+      setApolloError(e.message || 'Erro ao procurar no Apollo.');
+    } finally {
+      setApolloLoading(false);
+    }
+  };
+
+  const revealAndAdd = async (p: ApolloPerson) => {
+    setRevealingId(p.id);
+    setApolloError('');
+    try {
+      const r = await revealApolloEmail(p.id);
+      await saveContact(`a:${p.id}`, {
+        name: r.name || p.name,
+        role: r.title || p.title,
+        contactType: roleToContactType(r.title || p.title),
+        email: r.email,
+        notes: `Fonte: Apollo${r.emailStatus ? ` · email ${r.emailStatus}` : ''}${r.linkedinUrl || p.linkedinUrl ? ` · LinkedIn: ${r.linkedinUrl || p.linkedinUrl}` : ''} · Confiança: Provável`
+      });
+    } catch (e: any) {
+      setApolloError(e.message || 'Erro ao revelar o email.');
+    } finally {
+      setRevealingId(null);
+    }
+  };
 
   const search = async () => {
     setLoading(true);
@@ -192,6 +233,44 @@ export default function PeopleFinderModal({ lead, website, targetRoles, existing
                   </div>
                 )}
               </div>
+            )}
+          </section>
+
+          {/* Apollo */}
+          <section>
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-gray-500">Decisores no Apollo</h4>
+            <ApolloUsageBar tone="light" onAvailability={setApolloAvailable} />
+            <p className="mt-2 text-[11px] text-gray-500">Procurar decisores não gasta créditos. Revelar o email de uma pessoa gasta créditos do teto mensal.</p>
+            <button onClick={searchApollo} disabled={!apolloAvailable || apolloLoading} className="mt-2 flex items-center gap-1 rounded border border-gray-300 bg-white px-2.5 py-1 text-[11px] font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+              {apolloLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />} Procurar decisores
+            </button>
+            {apolloError && <p className="mt-2 text-xs text-rose-600">{apolloError}</p>}
+            {apolloPeople && apolloPeople.length === 0 && <p className="mt-2 text-xs text-gray-500">O Apollo não encontrou decisores para este domínio.</p>}
+            {apolloPeople && apolloPeople.length > 0 && (
+              <ul className="mt-2 space-y-1.5">
+                {apolloPeople.map((p) => {
+                  const key = `a:${p.id}`;
+                  const done = savedKeys.has(key);
+                  return (
+                    <li key={p.id} className="flex items-center justify-between gap-3 rounded-lg border border-gray-200 p-2.5">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-bold text-gray-900">{p.name}</span>
+                          {p.title && <span className="text-xs text-gray-600">{p.title}</span>}
+                        </div>
+                        <div className="text-[10px] text-gray-500">{p.hasEmail ? 'Email disponível (revelar gasta crédito)' : 'Sem email conhecido'}</div>
+                      </div>
+                      <button
+                        onClick={() => revealAndAdd(p)}
+                        disabled={done || revealingId === p.id || !apolloAvailable}
+                        className="shrink-0 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                      >
+                        {done ? 'Adicionado' : revealingId === p.id ? 'A revelar...' : 'Revelar email e adicionar'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </section>
 
