@@ -8,7 +8,7 @@ interface ApolloUsageBarProps {
   onAvailability?: (available: boolean) => void;
 }
 
-/** Barra com os creditos Apollo gastos no mes (teto de 75). */
+/** Barra com os creditos Apollo gastos no mes (o teto vem do servidor: 70 por omissao). */
 export default function ApolloUsageBar({ tone = 'dark', onAvailability }: ApolloUsageBarProps) {
   const [state, setState] = useState<ApolloUsageState | null>(null);
   const [failed, setFailed] = useState(false);
@@ -59,7 +59,7 @@ export default function ApolloUsageBar({ tone = 'dark', onAvailability }: Apollo
         className={`h-2 w-full overflow-hidden rounded-full ${track}`}
         role="progressbar"
         aria-valuemin={0}
-        aria-valuemax={state?.limit ?? 75}
+        aria-valuemax={state?.limit ?? 70}
         aria-valuenow={state?.used ?? 0}
         aria-label="Créditos Apollo usados no mês"
       >
