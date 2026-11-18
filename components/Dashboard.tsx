@@ -716,8 +716,13 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
     <div className="flex h-screen bg-ai-dark text-white overflow-hidden font-sans">
       <aside className="sol-sidebar w-64 h-screen min-h-0 border-r border-gray-800 hidden md:flex flex-col p-4 shrink-0">
         <div className="flex items-center gap-2 mb-8 px-2 shrink-0">
-            <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/20">
-              <Activity className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white shadow-lg shadow-emerald-500/20">
+              {/* «W» do Workio, com as cores da marca */}
+              <svg viewBox="0 0 64 64" className="w-6 h-6" aria-hidden="true">
+                <polygon points="5,17 31,17 18,45" fill="#23C7A6" stroke="#23C7A6" strokeWidth="6" strokeLinejoin="round" />
+                <polygon points="33,17 59,17 46,45" fill="#E85BA0" stroke="#E85BA0" strokeWidth="6" strokeLinejoin="round" />
+                <polygon points="23,45 41,45 32,17" fill="#F4D23C" stroke="#F4D23C" strokeWidth="6" strokeLinejoin="round" />
+              </svg>
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-sm tracking-tight text-white">LeadScope</span>
