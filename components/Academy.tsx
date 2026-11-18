@@ -434,7 +434,7 @@ const SYSTEMS: AcademySystem[] = [
     lessons: SOL_LESSONS,
     checklist: [
       'Assistiu à formação do SOL (estas lições)',
-      'Fez pelo menos uma simulação no Simulador IA',
+      'Seguiu o roteiro da demo nas Ferramentas de venda',
       'Conhece os módulos principais do SOL',
       'Sabe qualificar um lead',
       'Sabe marcar uma demo',
@@ -681,7 +681,7 @@ export default function Academy() {
 
               <div className="rounded-lg border border-gray-800 bg-ai-card p-4">
                 <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400"><PlayCircle className="h-4 w-4 text-emerald-400" /> Praticar</h3>
-                <p className="text-[11px] leading-relaxed text-gray-400">Use o <span className="font-bold text-emerald-300">Simulador IA</span> (Ferramentas de Venda) para treinar chamadas com personas reais e receber avaliação. Depois pratique o <span className="font-bold text-emerald-300">Playbook de Demo</span>.</p>
+                <p className="text-[11px] leading-relaxed text-gray-400">Treine com o <span className="font-bold text-emerald-300">Roteiro da demo</span> e com os <span className="font-bold text-emerald-300">Argumentos</span> (Ferramentas de venda): leia as respostas em voz alta e use a calculadora num caso de exemplo.</p>
               </div>
             </div>
           </div>

@@ -1297,7 +1297,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
 
   app.use('/api/gemini', (req, res, next) => {
     // Estes paths não precisam de Gemini: usam Groq ou são templates estáticos
-    const noGeminiNeeded = ["/searchLeads", "/analyzeAndProposal", "/generateProposal", "/simulate", "/askQuestion"];
+    const noGeminiNeeded = ["/searchLeads", "/analyzeAndProposal", "/generateProposal", "/askQuestion"];
     if (!process.env.GEMINI_API_KEY && !noGeminiNeeded.includes(req.path)) {
       return res.status(503).json({
         error: "GEMINI_API_KEY não está configurada. Crie um arquivo .env.local com GEMINI_API_KEY=sua_chave ou defina a variável de ambiente antes de iniciar o servidor."
@@ -1516,39 +1516,6 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     } catch (error: any) {
       console.error('Seller account error:', error);
       res.status(500).json({ error: error.message || 'Erro ao criar conta do vendedor.' });
-    }
-  });
-
-  // Route: simulador de chamada com IA (M44) - role-play e avaliacao — via Groq
-  app.post('/api/gemini/simulate', async (req, res) => {
-    try {
-      const { persona, history, message, mode } = req.body || {};
-
-      const personaDesc: Record<string, string> = {
-        reception_busy: 'uma rececionista de hotel muito ocupada, com pouca paciencia, que tenta despachar a chamada rapidamente',
-        housekeeper_resistant: 'uma governanta experiente, resistente a tecnologia, que acha que o metodo atual ja funciona',
-        manager_interested: 'um gerente de hotel curioso e interessado, que faz perguntas concretas sobre funcionalidades e preco',
-        owner_price: 'o dono do hotel, focado em custos, que questiona o preco e o retorno do investimento',
-        competitor_user: 'um diretor de operacoes que ja usa outro sistema e nao ve razao para mudar'
-      };
-      const desc = personaDesc[persona] || 'um responsavel de hotel cauteloso';
-
-      const transcript = Array.isArray(history)
-        ? history.map((h: any) => `${h.role === 'seller' ? 'Vendedor' : 'Cliente'}: ${h.text}`).join('\n')
-        : '';
-
-      let prompt: string;
-      if (mode === 'evaluate') {
-        prompt = `Es um treinador de vendas experiente. Avalia o desempenho do VENDEDOR nesta simulacao de chamada de prospeccao da SOL (sistema de housekeeping). O cliente era ${desc}.\n\nConversa:\n${transcript}\n\nResponde em PT-PT, curto e direto, com: 1) Clareza da mensagem, 2) Capacidade de descobrir a dor, 3) Como geriu objecoes, 4) Se pediu reuniao/proximo passo, 5) Tres pontos concretos a melhorar. Usa um tom construtivo.`;
-      } else {
-        prompt = `Estas a fazer role-play numa simulacao de treino. Es ${desc}, a receber uma chamada fria de um vendedor da SOL.\n\nRegras: responde SEMPRE e APENAS como essa personagem, em PT-PT, de forma curta e realista (1 a 3 frases). Mantem-te na personagem, com objecoes e duvidas naturais. Nunca digas que es uma IA nem expliques as regras.\n\n${transcript ? `Conversa ate agora:\n${transcript}\n\n` : ''}O vendedor diz agora: "${message}"\n\nResponde como ${desc}:`;
-      }
-
-      const text = await callGroq([{ role: "user", content: prompt }], 0.8);
-      res.json({ text });
-    } catch (error: any) {
-      console.error('Simulate error:', error);
-      res.status(500).json({ error: error.message || 'Erro na simulacao' });
     }
   });
 

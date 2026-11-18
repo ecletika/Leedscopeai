@@ -225,36 +225,6 @@ Notas da chamada: "${notes || 'sem notas'}".`;
   }
 };
 
-export interface SimTurn { role: 'seller' | 'customer'; text: string; }
-
-/**
- * Simulador de chamada com IA (M44). A IA faz role-play de uma persona de cliente
- * ou avalia o desempenho do vendedor (mode 'evaluate').
- */
-export const simulateCall = async (
-  persona: string,
-  history: SimTurn[],
-  message: string,
-  mode: 'roleplay' | 'evaluate' = 'roleplay'
-): Promise<string> => {
-  try {
-    const response = await fetch('/api/gemini/simulate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ persona, history, message, mode })
-    });
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(formatGeminiError(errData.error || `Server error ${response.status}`, response.status));
-    }
-    const data = await response.json();
-    return data.text || 'Sem resposta.';
-  } catch (error: any) {
-    console.error('simulateCall error:', error);
-    return `Erro na simulacao: ${formatGeminiError(error.message)}`;
-  }
-};
-
 export const analyzeAndGenerateProposal = async (
   leadData: Partial<Lead>
 ): Promise<Lead | null> => {
