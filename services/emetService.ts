@@ -130,8 +130,23 @@ export async function startEmetCall(
   if (!isEmetActive(cfg)) throw new Error('Extensão EMET não configurada.');
   const agent = await getUA(cfg);
 
+  // Elemento de áudio no DOM (um <audio> solto pode ficar mudo conforme o browser); toca o que o PABX envia.
   const audio = document.createElement('audio');
   audio.autoplay = true;
+  audio.muted = false;
+  audio.volume = 1;
+  audio.style.display = 'none';
+  document.body.appendChild(audio);
+  const removeAudio = () => { try { audio.srcObject = null; audio.remove(); } catch { /* ignore */ } };
+  const playRemote = (pc?: RTCPeerConnection) => {
+    // junta todas as faixas de áudio recebidas numa só stream (alguns PABX não enviam msid e ev.streams vem vazio)
+    const tracks = pc ? pc.getReceivers().map((r) => r.track).filter((t) => t && t.kind === 'audio') : [];
+    if (!tracks.length) return;
+    const cur = audio.srcObject as MediaStream | null;
+    if (cur && tracks.every((t) => cur.getTracks().includes(t))) { audio.play().catch(() => {}); return; }
+    audio.srcObject = new MediaStream(tracks);
+    audio.play().catch(() => {});
+  };
 
   const session: any = agent.call(`sip:${normalizeNumber(phone)}@${cfg.domain}`, {
     mediaConstraints: { audio: true, video: false },
@@ -148,16 +163,21 @@ export async function startEmetCall(
     if (!iceTimer) iceTimer = setTimeout(() => e.ready(), 1000);
   });
 
+  let pcRef: RTCPeerConnection | undefined;
   session.on('peerconnection', (e: any) => {
+    pcRef = e.peerconnection;
     e.peerconnection.addEventListener('track', (ev: RTCTrackEvent) => {
-      audio.srcObject = ev.streams[0];
-      audio.play().catch(() => {});
+      if (ev.streams && ev.streams[0]) { audio.srcObject = ev.streams[0]; audio.play().catch(() => {}); }
+      else playRemote(e.peerconnection);
     });
   });
-  session.on('confirmed', cb.onAccepted);
-  session.on('ended', () => { audio.srcObject = null; cb.onEnded(); });
+  // Garantia extra: em «progress» (early media), «accepted» e «confirmed» volta a ligar o áudio recebido.
+  session.on('progress', () => playRemote(pcRef || session.connection));
+  session.on('accepted', () => playRemote(pcRef || session.connection));
+  session.on('confirmed', () => { playRemote(pcRef || session.connection); cb.onAccepted(); });
+  session.on('ended', () => { removeAudio(); cb.onEnded(); });
   session.on('failed', (e: any) => {
-    audio.srcObject = null;
+    removeAudio();
     cb.onError('Chamada EMET falhou: ' + explain(e?.cause));
   });
 
