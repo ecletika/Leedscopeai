@@ -141,6 +141,23 @@ export interface CallAnalysis {
   raw?: string;
 }
 
+export type SaleItem = 'workio' | 'sol' | 'emet' | 'sistema' | 'site' | 'avenca_mensal' | 'avenca_anual';
+
+/** Venda de um artigo associada a um vendedor. `amount` vazio = valor ainda por lancar. */
+export interface CrmSale {
+  id: string;
+  soldAt: string; // AAAA-MM-DD
+  sellerId?: string;
+  sellerName?: string; // copia do nome no momento do registo
+  item: SaleItem;
+  leadId?: string;
+  clientName: string;
+  amount?: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 /** Sistemas que a equipa vende; scripts, objecoes e materiais pertencem a um deles. */
 export type CommercialSystem = 'workio' | 'sol' | 'emet';
 

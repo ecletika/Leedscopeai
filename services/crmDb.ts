@@ -7,6 +7,7 @@ import {
   CrmMaterial,
   CrmObjection,
   CrmScheduleSlot,
+  CrmSale,
   CrmScript,
   CrmSeller
 } from '../types';
@@ -19,6 +20,7 @@ const LS_SCHEDULE_KEY = 'leadscope_crm_schedule_slots';
 const LS_SCRIPTS_KEY = 'leadscope_crm_scripts';
 const LS_OBJECTIONS_KEY = 'leadscope_crm_objections';
 const LS_MATERIALS_KEY = 'leadscope_crm_materials';
+const LS_SALES_KEY = 'leadscope_crm_sales';
 
 const defaultCloseReasons: CrmCloseReason[] = [
   { id: 'reason-existing-system-no-interest', name: 'Ja tem sistema e nao quer ouvir', category: 'lost', requiresFollowUp: false, active: true },
@@ -143,6 +145,75 @@ export const crmDb = {
     if (idx >= 0) rows[idx] = material; else rows.push(material);
     writeLocal(LS_MATERIALS_KEY, rows);
     return !remoteFailed;
+  },
+
+  // ----- Vendas por vendedor (Admin Console) -----
+  async getSales(): Promise<CrmSale[]> {
+    if (isSupabaseConfigured()) {
+      const { data, error } = await supabase.from('crm_sales').select('*').order('sold_at', { ascending: false });
+      if (!error && data) return data.map(this.mapSaleFromDb);
+      console.error('Supabase sales query failed, using local fallback:', error);
+    }
+    return readLocal<CrmSale>(LS_SALES_KEY, []).sort((a, b) => b.soldAt.localeCompare(a.soldAt));
+  },
+
+  /** false = so ficou guardado neste browser (falha na base de dados). */
+  async saveSale(sale: CrmSale): Promise<boolean> {
+    let remoteFailed = false;
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('crm_sales').upsert(this.mapSaleToDb(sale), { onConflict: 'id' });
+      if (!error) return true;
+      console.error('Supabase sale save failed, using local fallback:', error);
+      remoteFailed = true;
+    }
+    const rows = readLocal<CrmSale>(LS_SALES_KEY, []);
+    const idx = rows.findIndex((item) => item.id === sale.id);
+    if (idx >= 0) rows[idx] = sale; else rows.push(sale);
+    writeLocal(LS_SALES_KEY, rows);
+    return !remoteFailed;
+  },
+
+  async deleteSale(id: string): Promise<boolean> {
+    let remoteFailed = false;
+    if (isSupabaseConfigured()) {
+      const { error } = await supabase.from('crm_sales').delete().eq('id', id);
+      if (!error) return true;
+      console.error('Supabase sale delete failed:', error);
+      remoteFailed = true;
+    }
+    writeLocal(LS_SALES_KEY, readLocal<CrmSale>(LS_SALES_KEY, []).filter((s) => s.id !== id));
+    return !remoteFailed;
+  },
+
+  mapSaleFromDb(row: any): CrmSale {
+    return {
+      id: row.id,
+      soldAt: row.sold_at,
+      sellerId: row.seller_id || undefined,
+      sellerName: row.seller_name || undefined,
+      item: row.item,
+      leadId: row.lead_id || undefined,
+      clientName: row.client_name,
+      amount: row.amount != null ? Number(row.amount) : undefined,
+      notes: row.notes || undefined,
+      createdAt: row.created_at || undefined,
+      updatedAt: row.updated_at || undefined
+    };
+  },
+
+  mapSaleToDb(sale: CrmSale) {
+    return {
+      id: sale.id,
+      sold_at: sale.soldAt,
+      seller_id: sale.sellerId || null,
+      seller_name: sale.sellerName || null,
+      item: sale.item,
+      lead_id: sale.leadId || null,
+      client_name: sale.clientName,
+      amount: sale.amount ?? null,
+      notes: sale.notes || null,
+      updated_at: new Date().toISOString()
+    };
   },
 
   async getCloseReasons(): Promise<CrmCloseReason[]> {

@@ -22,6 +22,8 @@ import ProposalBuilder from './ProposalBuilder';
 import ThemeToggle from './ThemeToggle';
 import Academy from './Academy';
 import WorkioCatalog from './WorkioCatalog';
+import AdminSales from './AdminSales';
+import { canAccessAdminConsole } from '../services/accessControl';
 import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, CalendarClock, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, Users, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot, BarChart3, KanbanSquare, BookOpen, RotateCcw, Lightbulb, GraduationCap, FileSignature } from 'lucide-react';
 import { searchLeadsInLocation, analyzeAndGenerateProposal, generateOutreachEmail, runStorefrontInvestigation, generateCommercialProposal, askLeadQuestion, generateWebsiteCode, refineWebsiteCode } from '../services/geminiService';
 import { hotelDb } from '../services/hotelDb';
@@ -369,8 +371,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
   // Admin States
   const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [plans, setPlans] = useState<PlanDefinition[]>(INITIAL_PLANS);
-  const [newPlan, setNewPlan] = useState<Partial<PlanDefinition>>({ name: '', price: '', credits: 100 });
+  // Planos de utilizador (so para escolher o plano ao editar um utilizador)
+  const plans = INITIAL_PLANS;
 
   // Filtros
   const [textFilter, setTextFilter] = useState('');
@@ -508,23 +510,6 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
       
       setAllUsers(allUsers.map(u => u.id === editingUser.id ? editingUser : u));
       setEditingUser(null);
-  };
-
-  const handleCreatePlan = () => {
-      if (!newPlan.name || !newPlan.price) return;
-      const plan: PlanDefinition = {
-          id: crypto.randomUUID(),
-          name: newPlan.name,
-          price: newPlan.price,
-          credits: newPlan.credits || 0,
-          features: []
-      };
-      setPlans([...plans, plan]);
-      setNewPlan({ name: '', price: '', credits: 100 });
-  };
-
-  const handleDeletePlan = (id: string) => {
-      setPlans(plans.filter(p => p.id !== id));
   };
 
   // --- Handlers para Ações nos Leads ---
@@ -673,6 +658,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
 
   // Menu lateral agrupado por area de trabalho
   const isAdmin = currentUser.role === 'admin';
+  // Admin Console: so o proprietario (mesmo que haja outros admins)
+  const canAdminConsole = canAccessAdminConsole(currentUser);
   const overdueCount = savedHotels.filter(h =>
     h.nextActionAt && new Date(h.nextActionAt) < new Date() && !['won', 'lost', 'do_not_contact'].includes(h.commercialStatus || 'new')
   ).length;
@@ -706,9 +693,9 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
         { tab: 'crm', label: 'Dashboard Vendas', icon: BarChart3 },
         ...(isAdmin ? [
           { tab: 'contracts' as TabId, label: 'Contratos', icon: FileSignature },
-          { tab: 'sellers' as TabId, label: 'Equipa Comercial', icon: Users },
-          { tab: 'admin' as TabId, label: 'Admin Console', icon: UserCog }
-        ] : [])
+          { tab: 'sellers' as TabId, label: 'Equipa Comercial', icon: Users }
+        ] : []),
+        ...(canAdminConsole ? [{ tab: 'admin' as TabId, label: 'Admin Console', icon: UserCog }] : [])
       ]
     }
   ];
@@ -1295,7 +1282,13 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
             )}
 
             {/* --- ADMIN VIEW --- */}
-            {activeTab === 'admin' && (
+            {activeTab === 'admin' && !canAdminConsole && (
+                <div className="rounded-2xl border border-dashed border-gray-700 px-6 py-16 text-center">
+                    <p className="text-base font-semibold text-white">Sem acesso ao Admin Console</p>
+                    <p className="mx-auto mt-2 max-w-md text-sm text-gray-400">Este módulo está reservado ao proprietário da plataforma.</p>
+                </div>
+            )}
+            {activeTab === 'admin' && canAdminConsole && (
                 <div className="space-y-8">
                     {/* User Management */}
                     <div className="bg-ai-card border border-gray-800 rounded-xl p-6">
@@ -1351,70 +1344,8 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                     {/* Modulos e planos Workio (M01..M27) */}
                     <WorkioCatalog />
 
-                    {/* Plan Management */}
-                    <div className="bg-ai-card border border-gray-800 rounded-xl p-6">
-                        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-                            <CreditCard className="text-ai-accent" /> Planos de utilizador (créditos de prospeção)
-                        </h2>
-                        
-                        {/* New Plan Input */}
-                        <div className="flex flex-wrap gap-4 mb-6 bg-gray-800/50 p-4 rounded-lg items-end">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Nome do Plano</label>
-                                <input 
-                                    value={newPlan.name} onChange={e => setNewPlan({...newPlan, name: e.target.value})}
-                                    placeholder="Ex: Enterprise" className="bg-ai-dark border border-gray-700 rounded p-2 text-sm w-40"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Preço Display</label>
-                                <input 
-                                    value={newPlan.price} onChange={e => setNewPlan({...newPlan, price: e.target.value})}
-                                    placeholder="Ex: 299€" className="bg-ai-dark border border-gray-700 rounded p-2 text-sm w-24"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 mb-1">Créditos Padrão</label>
-                                <input 
-                                    type="number" value={newPlan.credits} onChange={e => setNewPlan({...newPlan, credits: parseInt(e.target.value)})}
-                                    className="bg-ai-dark border border-gray-700 rounded p-2 text-sm w-24"
-                                />
-                            </div>
-                            <button 
-                                onClick={handleCreatePlan}
-                                className="bg-ai-accent hover:bg-blue-600 text-white font-bold rounded p-2 px-4 text-sm flex items-center gap-2 h-[38px]"
-                            >
-                                <Plus className="w-4 h-4" /> Criar Plano
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                            {plans.map(plan => (
-                                <div key={plan.id} className="border border-gray-700 bg-gray-800 rounded-lg p-4 relative group">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <h3 className="font-bold text-white">{plan.name}</h3>
-                                        <span className="text-sm text-ai-accent font-bold">{plan.price}</span>
-                                    </div>
-                                    <p className="text-xs text-gray-400 mb-2">Inclui {plan.credits} créditos</p>
-                                    <button 
-                                        onClick={() => handleDeletePlan(plan.id)}
-                                        className="absolute top-2 right-2 p-1 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Gemini API Diagnostics & System Health */}
-                    <div className="bg-ai-card border border-gray-800 rounded-xl p-6">
-                        <div className="flex items-center gap-2 mb-5">
-                            <Server className="w-5 h-5 text-ai-accent" />
-                            <h2 className="text-lg font-bold text-white">Estado & Diagnóstico da API Gemini</h2>
-                        </div>
-                        <SystemHealth />
-                    </div>
+                    {/* Vendas associadas a vendedores */}
+                    <AdminSales sellers={crmSellers} leads={savedHotels.map((h) => ({ id: h.id, companyName: h.companyName }))} />
                 </div>
             )}
         </div>
