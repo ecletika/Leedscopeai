@@ -682,7 +682,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
     {
       title: 'Formação e materiais',
       items: [
-        { tab: 'academy', label: 'Academia Workio', icon: GraduationCap },
+        { tab: 'academy', label: 'Academia', icon: GraduationCap },
         { tab: 'tools', label: 'Ferramentas de Venda', icon: Lightbulb },
         ...(isAdmin ? [{ tab: 'library' as TabId, label: 'Scripts & Materiais', icon: BookOpen }] : [])
       ]
@@ -762,7 +762,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 {activeTab === 'pipeline' && 'Pipeline Comercial'}
                 {activeTab === 'followup' && 'Hoje: follow-ups e planeamento'}
                 {activeTab === 'tools' && 'Ferramentas de Venda'}
-                {activeTab === 'academy' && 'Academia Workio'}
+                {activeTab === 'academy' && 'Academia'}
                 {activeTab === 'crm' && 'Dashboard de Vendas'}
                 {activeTab === 'contracts' && 'Gerador de Contratos'}
                 {activeTab === 'sellers' && 'Equipa Comercial'}
