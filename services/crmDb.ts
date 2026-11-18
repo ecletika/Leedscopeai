@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import {
+  CommercialSystem,
   CrmActivity,
   CrmCloseReason,
   CrmContact,
@@ -78,17 +79,20 @@ export const crmDb = {
     return readLocal<CrmScript>(LS_SCRIPTS_KEY, defaultScripts);
   },
 
+  // Os save* devolvem false quando a gravacao na base de dados falhou e so ficou neste browser
   async saveScript(script: CrmScript): Promise<boolean> {
+    let remoteFailed = false;
     if (isSupabaseConfigured()) {
       const { error } = await supabase.from('crm_scripts').upsert(this.mapScriptToDb(script), { onConflict: 'id' });
       if (!error) return true;
-      console.warn('Supabase script save failed, using local fallback:', error);
+      console.error('Supabase script save failed, using local fallback:', error);
+      remoteFailed = true;
     }
     const rows = readLocal<CrmScript>(LS_SCRIPTS_KEY, defaultScripts);
     const idx = rows.findIndex((item) => item.id === script.id);
     if (idx >= 0) rows[idx] = script; else rows.push(script);
     writeLocal(LS_SCRIPTS_KEY, rows);
-    return true;
+    return !remoteFailed;
   },
 
   // ----- Objeccoes (M28) -----
@@ -102,16 +106,18 @@ export const crmDb = {
   },
 
   async saveObjection(objection: CrmObjection): Promise<boolean> {
+    let remoteFailed = false;
     if (isSupabaseConfigured()) {
       const { error } = await supabase.from('crm_objections').upsert(this.mapObjectionToDb(objection), { onConflict: 'id' });
       if (!error) return true;
-      console.warn('Supabase objection save failed, using local fallback:', error);
+      console.error('Supabase objection save failed, using local fallback:', error);
+      remoteFailed = true;
     }
     const rows = readLocal<CrmObjection>(LS_OBJECTIONS_KEY, defaultObjections);
     const idx = rows.findIndex((item) => item.id === objection.id);
     if (idx >= 0) rows[idx] = objection; else rows.push(objection);
     writeLocal(LS_OBJECTIONS_KEY, rows);
-    return true;
+    return !remoteFailed;
   },
 
   // ----- Materiais (M28) -----
@@ -125,16 +131,18 @@ export const crmDb = {
   },
 
   async saveMaterial(material: CrmMaterial): Promise<boolean> {
+    let remoteFailed = false;
     if (isSupabaseConfigured()) {
       const { error } = await supabase.from('crm_materials').upsert(this.mapMaterialToDb(material), { onConflict: 'id' });
       if (!error) return true;
-      console.warn('Supabase material save failed, using local fallback:', error);
+      console.error('Supabase material save failed, using local fallback:', error);
+      remoteFailed = true;
     }
     const rows = readLocal<CrmMaterial>(LS_MATERIALS_KEY, defaultMaterials);
     const idx = rows.findIndex((item) => item.id === material.id);
     if (idx >= 0) rows[idx] = material; else rows.push(material);
     writeLocal(LS_MATERIALS_KEY, rows);
-    return true;
+    return !remoteFailed;
   },
 
   async getCloseReasons(): Promise<CrmCloseReason[]> {
@@ -337,6 +345,7 @@ export const crmDb = {
       language: row.language || undefined,
       country: row.country || undefined,
       content: row.content || '',
+      system: (row.system || 'sol') as CommercialSystem,
       active: row.active ?? true,
       createdAt: row.created_at || undefined,
       updatedAt: row.updated_at || undefined
@@ -346,6 +355,7 @@ export const crmDb = {
   mapScriptToDb(script: CrmScript) {
     return {
       id: script.id,
+      system: script.system || 'sol',
       name: script.name,
       target_role: script.targetRole || null,
       language: script.language || null,
@@ -366,6 +376,7 @@ export const crmDb = {
       recommendedMaterial: row.recommended_material || undefined,
       nextAction: row.next_action || undefined,
       category: row.category || undefined,
+      system: (row.system || 'sol') as CommercialSystem,
       active: row.active ?? true,
       createdAt: row.created_at || undefined,
       updatedAt: row.updated_at || undefined
@@ -375,6 +386,7 @@ export const crmDb = {
   mapObjectionToDb(objection: CrmObjection) {
     return {
       id: objection.id,
+      system: objection.system || 'sol',
       objection: objection.objection,
       suggested_response: objection.suggestedResponse,
       full_response: objection.fullResponse || null,
@@ -395,6 +407,12 @@ export const crmDb = {
       url: row.url || undefined,
       description: row.description || undefined,
       targetStage: row.target_stage || undefined,
+      system: (row.system || 'sol') as CommercialSystem,
+      moduleCode: row.module_code || undefined,
+      content: row.content || undefined,
+      fileName: row.file_name || undefined,
+      fileType: row.file_type || undefined,
+      fileSize: row.file_size != null ? Number(row.file_size) : undefined,
       active: row.active ?? true,
       createdAt: row.created_at || undefined,
       updatedAt: row.updated_at || undefined
@@ -404,6 +422,12 @@ export const crmDb = {
   mapMaterialToDb(material: CrmMaterial) {
     return {
       id: material.id,
+      system: material.system || 'sol',
+      module_code: material.moduleCode || null,
+      content: material.content || null,
+      file_name: material.fileName || null,
+      file_type: material.fileType || null,
+      file_size: material.fileSize ?? null,
       title: material.title,
       material_type: material.materialType,
       url: material.url || null,

@@ -595,17 +595,28 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     }
   };
 
-  const materials: { title: string; benefit: string; url?: string }[] = dbMaterials.length
-    ? dbMaterials.map((m) => ({ title: m.title, benefit: m.description || '', url: m.url }))
-    : presentationCards.map((c) => ({ ...c, url: undefined }));
-  const objections: { objection: string; response: string; full?: string; question?: string; material?: string; next?: string }[] = scriptProduct === 'emet'
-    ? []
-    : scriptProduct === 'workio'
-    ? WORKIO_OBJECTIONS.map((o) => ({ objection: o.objection, response: o.response, full: o.full, question: o.question, material: o.material, next: o.next }))
-    : dbObjections.length
-    ? dbObjections.map((o) => ({ objection: o.objection, response: o.suggestedResponse, full: o.fullResponse, question: o.followUpQuestion, material: o.recommendedMaterial, next: o.nextAction }))
-    : objectionBank.map((o) => ({ objection: o.objection, response: o.response, full: undefined as string | undefined, question: undefined as string | undefined, material: undefined as string | undefined, next: undefined as string | undefined }));
-  const selectedScript = dbScripts.find((s) => s.id === selectedScriptId);
+  type ObjectionView = { objection: string; response: string; full?: string; question?: string; material?: string; next?: string };
+
+  // Conteudo da biblioteca (Scripts & Materiais) do sistema escolhido
+  const scriptsForProduct = dbScripts.filter((s) => (s.system || 'sol') === scriptProduct);
+  const dbObjectionsForProduct: ObjectionView[] = dbObjections
+    .filter((o) => (o.system || 'sol') === scriptProduct)
+    .map((o) => ({ objection: o.objection, response: o.suggestedResponse, full: o.fullResponse, question: o.followUpQuestion, material: o.recommendedMaterial, next: o.nextAction }));
+  const objections: ObjectionView[] = scriptProduct === 'workio'
+    ? [
+        ...dbObjectionsForProduct,
+        ...WORKIO_OBJECTIONS
+          .filter((o) => !dbObjectionsForProduct.some((d) => d.objection.toLowerCase() === o.objection.toLowerCase()))
+          .map((o) => ({ objection: o.objection, response: o.response, full: o.full, question: o.question, material: o.material, next: o.next }))
+      ]
+    : scriptProduct === 'sol' && dbObjectionsForProduct.length === 0
+    ? objectionBank.map((o) => ({ objection: o.objection, response: o.response }))
+    : dbObjectionsForProduct;
+  const selectedScript = scriptsForProduct.find((s) => s.id === selectedScriptId);
+  // Materiais do sistema da demo, separados por modulo (se escolheu um modulo Workio, so desse modulo)
+  const demoMaterials = dbMaterials.filter((m) =>
+    (m.system || 'sol') === demoProduct && (demoProduct !== 'workio' || !focusModule || !m.moduleCode || m.moduleCode === focusModule) && (m.url || m.content)
+  );
 
   useEffect(() => {
     loadData();
@@ -1090,16 +1101,16 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                 <MessageSquare className="h-3.5 w-3.5" /> Guiao de chamada
               </h3>
               {renderProductTabs(scriptProduct, setScriptProduct, 'Produto do guião')}
-              {scriptProduct === 'sol' && dbScripts.length > 0 && (
-                <select value={selectedScriptId} onChange={(e) => setSelectedScriptId(e.target.value)} className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[11px] text-gray-700 shadow-sm focus:border-emerald-500 focus:outline-none">
+              {scriptsForProduct.length > 0 && (
+                <select value={selectedScript ? selectedScriptId : ''} onChange={(e) => setSelectedScriptId(e.target.value)} aria-label="Escolher guião" className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[11px] text-gray-700 shadow-sm focus:border-emerald-500 focus:outline-none">
                   <option value="">Guiao padrao</option>
-                  {dbScripts.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  {scriptsForProduct.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               )}
             </div>
-            {scriptProduct === 'sol' && selectedScript ? (
+            {selectedScript ? (
               <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-gray-800">
-                {selectedScript.content.replace(/\[NOME\]/g, nameFor('sol'))}
+                {selectedScript.content.replace(/\[NOME\]/g, nameFor(scriptProduct))}
               </div>
             ) : scriptProduct === 'workio' ? (
               <div className="space-y-2 text-[13px] leading-relaxed text-gray-700">
@@ -1443,6 +1454,28 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               </div>
 
             </div>
+            )}
+
+            {/* Materiais do sistema (Scripts & Materiais), por modulo */}
+            {demoMaterials.length > 0 && (
+              <div className="mx-4 mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-emerald-700">Materiais · {PRODUCTS.find((p) => p.id === demoProduct)?.label}</h3>
+                <ul className="space-y-1.5">
+                  {demoMaterials.map((m) => (
+                    <li key={m.id} className="rounded border border-emerald-100 bg-white p-2 text-[11px] text-gray-700">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-bold text-gray-900">{m.title}</span>
+                        <span className="shrink-0 font-mono text-[10px] text-gray-400">{m.moduleCode || 'Geral'}</span>
+                      </div>
+                      {m.materialType === 'text' && m.content && <p className="mt-1 whitespace-pre-wrap text-gray-600">{m.content}</p>}
+                      {m.description && <p className="mt-0.5 text-gray-500">{m.description}</p>}
+                      {m.url && m.materialType !== 'text' && (
+                        <a href={m.url} target="_blank" rel="noreferrer" className="mt-1 inline-block font-bold text-emerald-700 hover:underline">{m.materialType === 'pdf' ? 'Abrir PDF' : 'Abrir'}</a>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </section>
