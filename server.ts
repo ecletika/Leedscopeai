@@ -2458,7 +2458,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   // contador ANTES de chamar o Apollo; atingido o teto, nenhum pedido sai.
   // NOTA: o contador e interno (o que ESTA app gastou); nao le o saldo real do Apollo.
   const APOLLO_BASE = "https://api.apollo.io/api/v1";
-  const APOLLO_MONTHLY_LIMIT = 75;
+  // Teto mensal (pode ser ajustado na Vercel com APOLLO_MONTHLY_LIMIT, sem mexer no codigo)
+  const APOLLO_MONTHLY_LIMIT = Number(process.env.APOLLO_MONTHLY_LIMIT) > 0 ? Math.floor(Number(process.env.APOLLO_MONTHLY_LIMIT)) : 75;
   const apolloKey = () => process.env.CLIENT_API_APOLLO?.trim();
 
   async function getApolloUsage(): Promise<number | null> {

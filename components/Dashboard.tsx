@@ -31,6 +31,7 @@ import { SystemHealth } from './SystemHealth';
 import { SEGMENTS, CUSTOM_SEGMENT_ID, getSegment } from '../services/segments';
 import { searchApolloCompanies } from '../services/apolloService';
 import ApolloUsageBar from './ApolloUsageBar';
+import ApolloUsagePill from './ApolloUsagePill';
 
 const AGENTS = [
   { id: 0, name: 'Líder de Missão', role: 'Orquestrador', icon: 'orchestrator' },
@@ -800,6 +801,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                         <span className="text-gray-400 text-xs">créditos</span>
                     </div>
                 )}
+                <ApolloUsagePill />
                 <div className="flex items-center gap-2 text-gray-400 text-xs font-mono">
                     <UserIcon className="w-3.5 h-3.5 text-emerald-500" /> {currentUser.name} ({currentUser.role})
                 </div>

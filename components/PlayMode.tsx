@@ -45,6 +45,8 @@ import { crmDb } from '../services/crmDb';
 import { hotelDb } from '../services/hotelDb';
 import { getLeadPitch, buildWorkioScript, buildWorkioDemo, WORKIO_OBJECTIONS } from '../services/workioSales';
 import PeopleFinderModal from './PeopleFinderModal';
+import { getSegment } from '../services/segments';
+import { WORKIO_MODULES } from '../services/workioModules';
 import { destroyTwilioDevice } from '../services/twilioService';
 import { destroyEmetUA } from '../services/emetService';
 import { analyzeCallNotes } from '../services/geminiService';
@@ -385,6 +387,17 @@ const statusButtons: {
   { label: 'Nao contactar mais', status: 'do_not_contact', nextAction: 'none', tone: 'bg-red-800 hover:bg-red-700', needsCloseReason: true }
 ];
 
+const activityTypeLabels: Record<string, string> = {
+  call: 'Chamada', email: 'Email', whatsapp: 'WhatsApp', demo: 'Demo', note: 'Nota', status_change: 'Mudança de estado', proposal: 'Proposta'
+};
+
+type ProductId = 'workio' | 'sol' | 'emet';
+const PRODUCTS: { id: ProductId; label: string }[] = [
+  { id: 'workio', label: 'Workio' },
+  { id: 'sol', label: 'SOL' },
+  { id: 'emet', label: 'EMET' }
+];
+
 interface FinishOverride {
   status: CommercialLeadStatus;
   nextType: NextActionType;
@@ -412,10 +425,23 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const pitch = useMemo(() => getLeadPitch(lead.niche), [lead.niche]);
   const isWorkio = pitch.kind === 'workio';
   const workioSegment = pitch.kind === 'workio' ? pitch.segment : undefined;
-  const sellerName = seller?.name || (isWorkio ? 'a equipa Workio' : 'a equipa SOL');
-  const workioScript = useMemo(() => (isWorkio ? buildWorkioScript(workioSegment, sellerName) : null), [isWorkio, workioSegment, sellerName]);
-  const workioDemo = useMemo(() => (isWorkio ? buildWorkioDemo(workioSegment) : null), [isWorkio, workioSegment]);
-  const demoUrl: string | undefined = isWorkio ? ((import.meta as any).env?.VITE_WORKIO_DEMO_URL || undefined) : 'https://sol.ecletika.com';
+  // Produto a apresentar: guiao de chamada e demo escolhem-se separadamente (Workio / SOL / EMET)
+  const defaultProduct: ProductId = isWorkio ? 'workio' : 'sol';
+  const [scriptProduct, setScriptProduct] = useState<ProductId>(defaultProduct);
+  const [demoProduct, setDemoProduct] = useState<ProductId>(defaultProduct);
+  const [focusModule, setFocusModule] = useState('');
+  const [resultTab, setResultTab] = useState<'resultado' | 'historico'>('resultado');
+  const nameFor = (p: ProductId) => seller?.name || `a equipa ${PRODUCTS.find((x) => x.id === p)?.label}`;
+  const sellerName = nameFor(defaultProduct);
+  // Workio para hoteis usa o segmento "hotelaria" (ponto, escalas...); o SOL e o sistema de housekeeping
+  const workioPitchSegment = workioSegment ?? (isWorkio ? undefined : getSegment('hotelaria'));
+  const workioScript = useMemo(() => buildWorkioScript(workioPitchSegment, seller?.name || 'a equipa Workio'), [workioPitchSegment, seller?.name]);
+  const workioDemo = useMemo(() => buildWorkioDemo(workioPitchSegment), [workioPitchSegment]);
+  const demoUrls: Record<ProductId, string | undefined> = {
+    workio: (import.meta as any).env?.VITE_WORKIO_DEMO_URL || undefined,
+    sol: 'https://sol.ecletika.com',
+    emet: (import.meta as any).env?.VITE_EMET_DEMO_URL || undefined
+  };
 
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [activities, setActivities] = useState<CrmActivity[]>([]);
@@ -429,17 +455,10 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
   // Resultado da chamada
   const [interest, setInterest] = useState<'low' | 'medium' | 'high'>('medium');
-  // Rascunho das notas: sobrevive a fechar o Play / refrescar a pagina antes de guardar
+  // O resultado da chamada abre sempre limpo; o que foi falado antes esta no separador Historico.
+  // (chave do rascunho antigo, so para o limpar)
   const draftKey = `leadscope_play_notes_${lead.id}`;
-  const [notes, setNotes] = useState(() => {
-    try { return localStorage.getItem(`leadscope_play_notes_${lead.id}`) || ''; } catch { return ''; }
-  });
-  useEffect(() => {
-    try {
-      if (notes.trim()) localStorage.setItem(draftKey, notes);
-      else localStorage.removeItem(draftKey);
-    } catch { /* ignore */ }
-  }, [notes, draftKey]);
+  const [notes, setNotes] = useState('');
   const finishedRef = useRef(false);
   const [answeredBy, setAnsweredBy] = useState('');
   const [answeredRole, setAnsweredRole] = useState('');
@@ -579,7 +598,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const materials: { title: string; benefit: string; url?: string }[] = dbMaterials.length
     ? dbMaterials.map((m) => ({ title: m.title, benefit: m.description || '', url: m.url }))
     : presentationCards.map((c) => ({ ...c, url: undefined }));
-  const objections = isWorkio
+  const objections: { objection: string; response: string; full?: string; question?: string; material?: string; next?: string }[] = scriptProduct === 'emet'
+    ? []
+    : scriptProduct === 'workio'
     ? WORKIO_OBJECTIONS.map((o) => ({ objection: o.objection, response: o.response, full: o.full, question: o.question, material: o.material, next: o.next }))
     : dbObjections.length
     ? dbObjections.map((o) => ({ objection: o.objection, response: o.suggestedResponse, full: o.fullResponse, question: o.followUpQuestion, material: o.recommendedMaterial, next: o.nextAction }))
@@ -663,10 +684,48 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     setAiScore(result.score);
   };
 
+  // Texto que fica no historico: com quem falou + o que foi falado
+  const buildActivityNotes = (): string | undefined => {
+    const spokeWith = [answeredBy.trim(), answeredRole.trim() ? `(${answeredRole.trim()})` : ''].filter(Boolean).join(' ');
+    const meta = [
+      spokeWith ? `Falou com: ${spokeWith}` : '',
+      decisionName.trim() ? `Decisor: ${decisionName.trim()}` : '',
+      selectedPhone ? `Número: ${selectedPhone}` : ''
+    ].filter(Boolean).join(' · ');
+    const text = [meta, notes.trim()].filter(Boolean).join('\n');
+    return text || undefined;
+  };
+
+  // Limpa o formulario para a proxima chamada (o historico fica gravado)
+  const resetCallForm = () => {
+    setNotes('');
+    setAnsweredBy('');
+    setAnsweredRole('');
+    setDecisionPhone('');
+    setDecisionEmail('');
+    setSelectedObjections([]);
+    setOpenObjection(null);
+    setInterest('medium');
+    setAiSummary('');
+    setNextActionType('call');
+    setNextActionAt(plusDays(1));
+    setCloseReasonId('');
+  };
+
+  // "Gravar": guarda o resultado desta chamada no historico e deixa o formulario limpo
+  const handleRecord = async () => {
+    if (!notes.trim() && !answeredBy.trim()) {
+      alert('Escreva as notas da chamada ou quem atendeu antes de gravar.');
+      return;
+    }
+    const ok = await handleFinish({ status: pendingStatus, nextType: nextActionType, nextAt: nextActionAt, reasonId: closeReasonId, keepOpen: true });
+    if (ok) setResultTab('historico');
+  };
+
   // "Sair" sem guardar: nao perder as notas da chamada — grava-as no historico do lead
   const handleExit = async () => {
-    const text = notes.trim();
-    if (text && !finishedRef.current) {
+    const text = buildActivityNotes();
+    if ((notes.trim() || answeredBy.trim()) && text && !finishedRef.current) {
       const ok = await crmDb.createActivity({
         id: crypto.randomUUID(),
         leadId: lead.id,
@@ -728,7 +787,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
     if (closing && !reasonId) {
       alert('Escolha um motivo de encerramento antes de guardar.');
-      return;
+      return false;
     }
     setSaving(true);
     try {
@@ -762,7 +821,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         sellerId: lead.responsibleSellerId,
         activityType: 'call',
         outcome: statusButtons.find((b) => b.status === status)?.label || status,
-        notes: notes.trim() || undefined,
+        notes: buildActivityNotes(),
         objections: selectedObjections.length ? selectedObjections : undefined,
         interestLevel: interest,
         nextActionType: finalNextAt ? nextType : 'none',
@@ -777,7 +836,8 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
       try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
 
       // 3) Guarda decisor como contacto, se preenchido
-      if (decisionName.trim()) {
+      const decisionAlreadySaved = contacts.some((c) => (c.name || '').trim().toLowerCase() === decisionName.trim().toLowerCase());
+      if (decisionName.trim() && !decisionAlreadySaved) {
         await crmDb.saveContact({
           id: crypto.randomUUID(),
           leadId: lead.id,
@@ -793,19 +853,41 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
       onSaved();
       if (o?.keepOpen) {
-        // continua no Play (ex.: a abrir os templates de email): limpa as notas ja registadas
-        setNotes('');
+        // continua no Play: o formulario fica limpo e o historico atualizado
+        resetCallForm();
         finishedRef.current = false;
+        await loadData();
       } else {
         onClose();
       }
+      return true;
     } catch (err: any) {
       console.error('Erro ao concluir Play:', err);
       alert('Nao foi possivel guardar o resultado da chamada.');
+      return false;
     } finally {
       setSaving(false);
     }
   };
+
+  const demoPhasesView: DemoPhase[] = demoProduct === 'workio' ? workioDemo.phases : demoPhases;
+
+  // Barra Workio / SOL / EMET (guiao e demo)
+  const renderProductTabs = (value: ProductId, onChange: (p: ProductId) => void, label: string) => (
+    <div role="group" aria-label={label} className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 shadow-sm">
+      {PRODUCTS.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          aria-pressed={value === p.id}
+          onClick={() => onChange(p.id)}
+          className={`rounded-md px-2.5 py-1 text-[11px] font-bold transition ${value === p.id ? 'bg-emerald-600 text-white' : 'text-gray-500 hover:text-gray-800'}`}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
 
   const interestTones: Record<string, string> = {
     low: 'bg-rose-100 text-rose-700 border-rose-300',
@@ -868,45 +950,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
-            {/* Ferramentas — movidas para dentro do Play */}
-            {onOpenDemo && (
-              <button onClick={onOpenDemo} title="Demo comercial" className="flex items-center gap-1 rounded-lg border border-cyan-300 bg-cyan-50 px-2.5 py-2 text-[11px] font-bold text-cyan-700 shadow-sm transition hover:bg-cyan-100">
-                <Presentation className="h-3.5 w-3.5" /> Demo
-              </button>
-            )}
-            {onOpenMessages && (
-              <button onClick={onOpenMessages} title="Templates email/WhatsApp" className="rounded-lg border border-sky-300 bg-sky-50 p-2 text-sky-700 shadow-sm transition hover:bg-sky-100">
-                <MessagesSquare className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {onOpenQualify && (
-              <button onClick={onOpenQualify} title="Qualificar lead" className="rounded-lg border border-amber-300 bg-amber-50 p-2 text-amber-700 shadow-sm transition hover:bg-amber-100">
-                <ClipboardCheck className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {onOpenProposalBuilder && (
-              <button onClick={onOpenProposalBuilder} title="Proposta comercial" className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 text-emerald-700 shadow-sm transition hover:bg-emerald-100">
-                <BadgePercent className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {onSelectProposal && (
-              <button onClick={onSelectProposal} title="Ver proposta" className="rounded-lg border border-blue-300 bg-blue-50 p-2 text-blue-700 shadow-sm transition hover:bg-blue-100">
-                <FileText className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {onSelectChat && (
-              <button onClick={onSelectChat} title="IA — perguntar sobre o lead" className="rounded-lg border border-purple-300 bg-purple-50 p-2 text-purple-700 shadow-sm transition hover:bg-purple-100">
-                <Bot className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {isAdmin && onOpenContract && (
-              <button onClick={onOpenContract} title="Gerar contrato para este cliente" className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-2 text-[11px] font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100">
-                <FileSignature className="h-3.5 w-3.5" /> Contrato
-              </button>
-            )}
+            {/* Canto superior direito: so Enriquecer e Sair */}
             {isAdmin && (
               <>
-                <div className="mx-1 h-5 w-px bg-gray-200" />
                 <div className="flex flex-col items-end">
                   <button
                     onClick={handleEnrich}
@@ -1043,18 +1089,19 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
                 <MessageSquare className="h-3.5 w-3.5" /> Guiao de chamada
               </h3>
-              {dbScripts.length > 0 && (
+              {renderProductTabs(scriptProduct, setScriptProduct, 'Produto do guião')}
+              {scriptProduct === 'sol' && dbScripts.length > 0 && (
                 <select value={selectedScriptId} onChange={(e) => setSelectedScriptId(e.target.value)} className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[11px] text-gray-700 shadow-sm focus:border-emerald-500 focus:outline-none">
                   <option value="">Guiao padrao</option>
                   {dbScripts.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               )}
             </div>
-            {selectedScript ? (
+            {scriptProduct === 'sol' && selectedScript ? (
               <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-gray-800">
-                {selectedScript.content.replace(/\[NOME\]/g, sellerName)}
+                {selectedScript.content.replace(/\[NOME\]/g, nameFor('sol'))}
               </div>
-            ) : workioScript ? (
+            ) : scriptProduct === 'workio' ? (
               <div className="space-y-2 text-[13px] leading-relaxed text-gray-700">
                 {workioScript.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
                 <p className="font-semibold text-emerald-700">{workioScript.closingQuestion}</p>
@@ -1065,9 +1112,13 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                   </ul>
                 </div>
               </div>
+            ) : scriptProduct === 'emet' ? (
+              <p className="rounded-lg border border-dashed border-emerald-300 bg-white p-3 text-[12px] text-gray-500">
+                O guião de chamada do EMET ainda não foi preenchido. Quando tiver o texto, é só acrescentá-lo aqui.
+              </p>
             ) : (
               <div className="space-y-2 text-[13px] leading-relaxed text-gray-700">
-                <p>Ola, bom dia. O meu nome e <span className="font-bold text-gray-900">{sellerName}</span> e falo da <span className="font-bold text-emerald-700">SOL</span>.</p>
+                <p>Ola, bom dia. O meu nome e <span className="font-bold text-gray-900">{nameFor('sol')}</span> e falo da <span className="font-bold text-emerald-700">SOL</span>.</p>
                 <p>Estamos a contactar alguns hoteis independentes porque desenvolvemos uma plataforma simples para ajudar equipas de housekeeping, recepcao e manutencao a coordenarem melhor quartos, limpezas, inspecoes e pedidos internos.</p>
                 <p>Normalmente falamos com o gerente ou com a governanta, porque o sistema ajuda a resolver problemas como quartos prontos tarde, comunicacao por WhatsApp e falta de visibilidade sobre limpezas e manutencao.</p>
                 <p>A ideia nao e tomar muito tempo agora. Gostava de perceber se faz sentido marcar uma apresentacao rapida de 15 a 20 minutos para mostrar como funciona na pratica.</p>
@@ -1078,8 +1129,58 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
           {/* Resultado da chamada */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">Resultado da chamada</h3>
+            <div role="tablist" aria-label="Resultado e histórico" className="mb-3 flex items-center gap-1 border-b border-gray-200">
+              {([
+                { id: 'resultado', label: 'Resultado da chamada' },
+                { id: 'historico', label: `Histórico (${activities.length})` }
+              ] as const).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={resultTab === t.id}
+                  onClick={() => setResultTab(t.id)}
+                  className={`-mb-px border-b-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition ${resultTab === t.id ? 'border-emerald-500 text-emerald-700' : 'border-transparent text-gray-400 hover:text-gray-700'}`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
 
+            {resultTab === 'historico' ? (
+              activities.length === 0 ? (
+                <p className="py-6 text-center text-[11px] text-gray-400">Ainda sem chamadas gravadas para este lead.</p>
+              ) : (
+                <ol className="space-y-3">
+                  {activities.map((a) => (
+                    <li key={a.id} className="rounded-lg border border-gray-200 p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-gray-900">
+                          {activityTypeLabels[a.activityType] || a.activityType}
+                          {a.outcome && <span className="ml-2 font-medium text-emerald-700">{a.outcome}</span>}
+                        </span>
+                        <span className="text-[10px] text-gray-400">
+                          {a.createdAt ? new Date(a.createdAt).toLocaleString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                        </span>
+                      </div>
+                      {a.interestLevel && (
+                        <span className={`mt-1 inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold ${interestTones[a.interestLevel]}`}>
+                          Interesse {a.interestLevel === 'low' ? 'baixo' : a.interestLevel === 'medium' ? 'médio' : 'alto'}
+                        </span>
+                      )}
+                      {a.notes && <p className="mt-1.5 whitespace-pre-wrap text-[12px] leading-relaxed text-gray-700">{a.notes}</p>}
+                      {a.objections && a.objections.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {a.objections.map((o, i) => <span key={i} className="rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] text-amber-700">{o}</span>)}
+                        </div>
+                      )}
+                      {a.nextActionAt && <div className="mt-1.5 text-[10px] text-gray-400">Próxima ação: {new Date(a.nextActionAt).toLocaleString('pt-PT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>}
+                    </li>
+                  ))}
+                </ol>
+              )
+            ) : (
+            <>
             <div className="mb-3 flex items-center gap-2">
               <span className="text-[11px] font-medium text-gray-500">Interesse:</span>
               {(['low', 'medium', 'high'] as const).map((level) => (
@@ -1167,6 +1268,15 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               ].map((q) => (
                 <button key={q.days} onClick={() => setNextActionAt(plusDays(q.days))} className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-[10px] font-bold text-gray-500 transition hover:border-emerald-300 hover:text-emerald-600">{q.label}</button>
               ))}
+              <button
+                type="button"
+                onClick={handleRecord}
+                disabled={saving}
+                title="Grava este resultado no histórico e limpa o formulário para a próxima chamada"
+                className="ml-auto flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60"
+              >
+                {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />} Gravar
+              </button>
             </div>
 
             {needsCloseReason && (
@@ -1178,23 +1288,61 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                 </select>
               </div>
             )}
+            </>
+            )}
           </div>
         </section>
 
         {/* CENTRO — Demo completa 30 min */}
         <section className="flex w-[38%] shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="shrink-0 border-b border-gray-200 px-4 py-2.5">
-            <span className="text-xs font-bold text-indigo-700">Demo completa — 30 min</span>
+          <div className="shrink-0 space-y-2 border-b border-gray-200 px-4 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-bold text-indigo-700">Demo completa</span>
+              {renderProductTabs(demoProduct, setDemoProduct, 'Produto da demo')}
+            </div>
+            {demoProduct === 'workio' && (
+              <label className="flex items-center gap-2 text-[11px] text-gray-500">
+                <span className="shrink-0 font-bold">Falar de um módulo:</span>
+                <select value={focusModule} onChange={(e) => setFocusModule(e.target.value)} className="min-w-0 flex-1 rounded border border-gray-300 bg-white px-2 py-1 text-[11px] text-gray-700 shadow-sm focus:border-indigo-400 focus:outline-none">
+                  <option value="">Demo completa (todos os módulos do segmento)</option>
+                  {[...WORKIO_MODULES].sort((a, b) => a.code.localeCompare(b.code)).map((m) => (
+                    <option key={m.code} value={m.code}>{m.code} · {m.name}</option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
+            {demoProduct === 'emet' ? (
+              <p className="m-4 rounded-lg border border-dashed border-indigo-300 bg-indigo-50 p-3 text-[12px] text-gray-500">
+                A demo do EMET ainda não foi preenchida. Quando tiver o guião e os passos, é só acrescentá-los aqui.
+              </p>
+            ) : (
             <div className="space-y-3 p-4">
+
+              {/* Modulo escolhido para falar ao cliente */}
+              {demoProduct === 'workio' && focusModule && (() => {
+                const m = WORKIO_MODULES.find((x) => x.code === focusModule);
+                if (!m) return null;
+                return (
+                  <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded border border-emerald-400 bg-white px-1.5 py-0.5 font-mono text-[11px] font-bold text-emerald-700">{m.code}</span>
+                      <span className="text-[13px] font-bold text-emerald-900">{m.name}</span>
+                    </div>
+                    <p className="mt-1.5 text-[12px] leading-relaxed text-gray-700">{m.description}</p>
+                    <p className="mt-1.5 text-[11px] text-gray-600"><span className="font-bold">Mostrar na demo:</span> {m.demo}</p>
+                    <p className="mt-1.5 rounded border border-sky-200 bg-sky-50 p-1.5 text-[10px] text-sky-800"><span className="font-bold">✅ Dica:</span> pergunte como fazem isto hoje e quanto tempo gastam; ligue a resposta ao que está no ecrã.</p>
+                  </div>
+                );
+              })()}
 
               {/* Checklist pre-demo */}
               <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
                 <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Checklist antes de comecar</h3>
                 <ul className="space-y-1">
-                  {(workioDemo?.checklist ?? demoChecklist).map((item) => (
+                  {(demoProduct === 'workio' ? workioDemo.checklist : demoChecklist).map((item) => (
                     <li key={item} className="flex items-center gap-2 text-[11px] text-indigo-800">
                       <CheckCircle className="h-3 w-3 shrink-0 text-indigo-400" />{item}
                     </li>
@@ -1206,7 +1354,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Adaptar pelo perfil do cliente</h3>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {(workioDemo?.adaptations ?? demoAdaptations).map((a) => (
+                  {(demoProduct === 'workio' ? workioDemo.adaptations : demoAdaptations).map((a) => (
                     <div key={a.role} className="rounded border border-gray-200 bg-white p-2">
                       <div className="text-[10px] font-bold text-gray-700">{a.role}</div>
                       <div className="mt-0.5 text-[10px] italic text-gray-500">{a.start}</div>
@@ -1217,7 +1365,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
               {/* Fases da demo — acordeao */}
               <div className="space-y-1.5">
-                {(workioDemo?.phases ?? demoPhases).map((phase) => {
+                {demoPhasesView.map((phase) => {
                   const isOpen = activeDemoStep === phase.id;
                   return (
                     <div key={phase.id} className={`overflow-hidden rounded-lg border transition ${isOpen ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
@@ -1235,7 +1383,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                           {phase.route && (
                             <span className="inline-block rounded border border-indigo-300 bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700">{phase.route}</span>
                           )}
-                          {!isWorkio && demoImages[phase.id] && (
+                          {demoProduct === 'sol' && demoImages[phase.id] && (
                             <img
                               src={demoImages[phase.id]}
                               alt={phase.title}
@@ -1288,13 +1436,14 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Modulos opcionais (se sobrar tempo)</h3>
                 <div className="flex flex-wrap gap-1">
-                  {(workioDemo?.optional ?? demoOptionalModules).map((m) => (
+                  {(demoProduct === 'workio' ? workioDemo.optional : demoOptionalModules).map((m) => (
                     <span key={m} className="rounded border border-gray-300 bg-white px-2 py-0.5 font-mono text-[10px] text-gray-600">{m}</span>
                   ))}
                 </div>
               </div>
 
             </div>
+            )}
           </div>
         </section>
 
@@ -1355,9 +1504,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               {b.label}
             </button>
           ))}
-          {demoUrl && (
+          {demoUrls[demoProduct] && (
             <button
-              onClick={() => window.open(demoUrl, '_blank')}
+              onClick={() => window.open(demoUrls[demoProduct], '_blank')}
               className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
             >
               <Monitor className="h-3.5 w-3.5" />
