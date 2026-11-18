@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import TwilioCall from './TwilioCall';
 import {
   AlertTriangle,
@@ -20,6 +20,7 @@ import {
   Phone,
   Plus,
   Presentation,
+  Search,
   ShieldOff,
   Sparkles,
   Star,
@@ -42,6 +43,8 @@ import {
 } from '../types';
 import { crmDb } from '../services/crmDb';
 import { hotelDb } from '../services/hotelDb';
+import { getLeadPitch, buildWorkioScript, buildWorkioDemo, WORKIO_OBJECTIONS } from '../services/workioSales';
+import PeopleFinderModal from './PeopleFinderModal';
 import { destroyTwilioDevice } from '../services/twilioService';
 import { destroyEmetUA } from '../services/emetService';
 import { analyzeCallNotes } from '../services/geminiService';
@@ -366,17 +369,30 @@ const statusButtons: {
   tone: string;
   needsReschedule?: boolean;
   needsCloseReason?: boolean;
+  /** Dias ate a proxima accao sugerida no dialogo de confirmacao */
+  autoDays?: number;
+  /** Texto de ajuda mostrado no dialogo */
+  hint?: string;
 }[] = [
-  { label: 'Agendar demo', status: 'demo_scheduled', nextAction: 'demo', tone: 'bg-orange-600 hover:bg-orange-500', needsReschedule: true },
-  { label: 'Decisor identificado', status: 'decision_maker_identified', nextAction: 'call', tone: 'bg-fuchsia-600 hover:bg-fuchsia-500' },
-  { label: 'Reagendar contacto', status: 'rescheduled', nextAction: 'call', tone: 'bg-amber-600 hover:bg-amber-500', needsReschedule: true },
-  { label: 'Enviar email', status: 'follow_up', nextAction: 'email', tone: 'bg-sky-600 hover:bg-sky-500' },
-  { label: 'Pediu ligar depois', status: 'rescheduled', nextAction: 'call', tone: 'bg-yellow-600 hover:bg-yellow-500', needsReschedule: true },
-  { label: 'Contactado recepcao', status: 'contacted_reception', nextAction: 'call', tone: 'bg-violet-600 hover:bg-violet-500' },
-  { label: 'Sem resposta', status: 'scheduled_contact', nextAction: 'call', tone: 'bg-slate-600 hover:bg-slate-500', needsReschedule: true },
+  { label: 'Agendar demo', status: 'demo_scheduled', nextAction: 'demo', tone: 'bg-orange-600 hover:bg-orange-500', needsReschedule: true, hint: 'Escolha a data e hora da demonstracao.' },
+  { label: 'Decisor identificado', status: 'decision_maker_identified', nextAction: 'call', tone: 'bg-fuchsia-600 hover:bg-fuchsia-500', autoDays: 1, hint: 'Regista o decisor e agenda nova chamada.' },
+  { label: 'Reagendar contacto', status: 'rescheduled', nextAction: 'call', tone: 'bg-amber-600 hover:bg-amber-500', needsReschedule: true, hint: 'Quando voltar a ligar?' },
+  { label: 'Enviar email', status: 'follow_up', nextAction: 'email', tone: 'bg-sky-600 hover:bg-sky-500', autoDays: 1, hint: 'Regista o follow-up e abre os modelos de mensagem.' },
+  { label: 'Pediu ligar depois', status: 'rescheduled', nextAction: 'call', tone: 'bg-yellow-600 hover:bg-yellow-500', needsReschedule: true, hint: 'Quando pediu para ligar?' },
+  { label: 'Contactado recepcao', status: 'contacted_reception', nextAction: 'call', tone: 'bg-violet-600 hover:bg-violet-500', autoDays: 2, hint: 'Atendeu a recepcao. Agenda nova tentativa para chegar ao decisor.' },
+  { label: 'Sem resposta', status: 'scheduled_contact', nextAction: 'call', tone: 'bg-slate-600 hover:bg-slate-500', autoDays: 1, hint: 'Regista a tentativa e volta a ligar.' },
   { label: 'Nao tem interesse', status: 'lost', nextAction: 'none', tone: 'bg-rose-700 hover:bg-rose-600', needsCloseReason: true },
   { label: 'Nao contactar mais', status: 'do_not_contact', nextAction: 'none', tone: 'bg-red-800 hover:bg-red-700', needsCloseReason: true }
 ];
+
+interface FinishOverride {
+  status: CommercialLeadStatus;
+  nextType: NextActionType;
+  nextAt?: string;
+  reasonId?: string;
+  /** Nao fecha o Play depois de gravar */
+  keepOpen?: boolean;
+}
 
 const fieldClass = 'w-full rounded-lg border border-gray-300 bg-white p-2.5 text-xs text-gray-900 placeholder-gray-400 focus:border-emerald-500 focus:outline-none shadow-sm';
 
@@ -392,7 +408,14 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     () => sellers.find((s) => s.id === lead.responsibleSellerId),
     [sellers, lead.responsibleSellerId]
   );
-  const sellerName = seller?.name || 'a equipa SOL';
+  // Hoteis vendem SOL; os restantes segmentos vendem Workio (guiao, demo e objecoes proprios)
+  const pitch = useMemo(() => getLeadPitch(lead.niche), [lead.niche]);
+  const isWorkio = pitch.kind === 'workio';
+  const workioSegment = pitch.kind === 'workio' ? pitch.segment : undefined;
+  const sellerName = seller?.name || (isWorkio ? 'a equipa Workio' : 'a equipa SOL');
+  const workioScript = useMemo(() => (isWorkio ? buildWorkioScript(workioSegment, sellerName) : null), [isWorkio, workioSegment, sellerName]);
+  const workioDemo = useMemo(() => (isWorkio ? buildWorkioDemo(workioSegment) : null), [isWorkio, workioSegment]);
+  const demoUrl: string | undefined = isWorkio ? ((import.meta as any).env?.VITE_WORKIO_DEMO_URL || undefined) : 'https://sol.ecletika.com';
 
   const [contacts, setContacts] = useState<CrmContact[]>([]);
   const [activities, setActivities] = useState<CrmActivity[]>([]);
@@ -406,7 +429,18 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
   // Resultado da chamada
   const [interest, setInterest] = useState<'low' | 'medium' | 'high'>('medium');
-  const [notes, setNotes] = useState('');
+  // Rascunho das notas: sobrevive a fechar o Play / refrescar a pagina antes de guardar
+  const draftKey = `leadscope_play_notes_${lead.id}`;
+  const [notes, setNotes] = useState(() => {
+    try { return localStorage.getItem(`leadscope_play_notes_${lead.id}`) || ''; } catch { return ''; }
+  });
+  useEffect(() => {
+    try {
+      if (notes.trim()) localStorage.setItem(draftKey, notes);
+      else localStorage.removeItem(draftKey);
+    } catch { /* ignore */ }
+  }, [notes, draftKey]);
+  const finishedRef = useRef(false);
   const [answeredBy, setAnsweredBy] = useState('');
   const [answeredRole, setAnsweredRole] = useState('');
   const [decisionName, setDecisionName] = useState(lead.contactPerson || '');
@@ -516,6 +550,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [newContactName, setNewContactName] = useState('');
   const [newContactPhone, setNewContactPhone] = useState('');
 
+  const [showPeopleFinder, setShowPeopleFinder] = useState(false);
+  const [quickDialog, setQuickDialog] = useState<{ button: (typeof statusButtons)[number]; at: string; reasonId: string } | null>(null);
+
   const closedStatuses: CommercialLeadStatus[] = ['lost', 'do_not_contact'];
   const needsCloseReason = closedStatuses.includes(pendingStatus);
 
@@ -542,7 +579,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const materials: { title: string; benefit: string; url?: string }[] = dbMaterials.length
     ? dbMaterials.map((m) => ({ title: m.title, benefit: m.description || '', url: m.url }))
     : presentationCards.map((c) => ({ ...c, url: undefined }));
-  const objections = dbObjections.length
+  const objections = isWorkio
+    ? WORKIO_OBJECTIONS.map((o) => ({ objection: o.objection, response: o.response, full: o.full, question: o.question, material: o.material, next: o.next }))
+    : dbObjections.length
     ? dbObjections.map((o) => ({ objection: o.objection, response: o.suggestedResponse, full: o.fullResponse, question: o.followUpQuestion, material: o.recommendedMaterial, next: o.nextAction }))
     : objectionBank.map((o) => ({ objection: o.objection, response: o.response, full: undefined as string | undefined, question: undefined as string | undefined, material: undefined as string | undefined, next: undefined as string | undefined }));
   const selectedScript = dbScripts.find((s) => s.id === selectedScriptId);
@@ -624,31 +663,93 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     setAiScore(result.score);
   };
 
-  const handleFinish = async () => {
-    if (needsCloseReason && !closeReasonId) {
+  // "Sair" sem guardar: nao perder as notas da chamada — grava-as no historico do lead
+  const handleExit = async () => {
+    const text = notes.trim();
+    if (text && !finishedRef.current) {
+      const ok = await crmDb.createActivity({
+        id: crypto.randomUUID(),
+        leadId: lead.id,
+        sellerId: lead.responsibleSellerId,
+        activityType: 'call',
+        outcome: 'Chamada (resultado nao concluido)',
+        notes: text,
+        interestLevel: interest,
+        nextActionType: 'none',
+        createdAt: new Date().toISOString()
+      });
+      if (ok) {
+        try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
+        onSaved();
+      } else {
+        alert('As notas ficaram guardadas apenas neste browser (falha ao gravar na base de dados).');
+      }
+    }
+    onClose();
+  };
+
+  // Botoes de resultado (rodape): abrem uma confirmacao e gravam logo
+  const handleQuickAction = (b: (typeof statusButtons)[number]) => {
+    applyQuickStatus(b);
+    setQuickDialog({
+      button: b,
+      at: b.nextAction === 'none' ? '' : plusDays(b.autoDays ?? (b.status === 'demo_scheduled' ? 1 : 2)),
+      reasonId: ''
+    });
+  };
+
+  const confirmQuickAction = async () => {
+    if (!quickDialog) return;
+    const { button, at, reasonId } = quickDialog;
+    const closing = closedStatuses.includes(button.status);
+    if (closing && !reasonId) {
+      alert('Escolha um motivo de encerramento.');
+      return;
+    }
+    if (button.nextAction !== 'none' && !at) {
+      alert('Indique a data e hora da proxima accao.');
+      return;
+    }
+    const keepOpen = button.nextAction === 'email';
+    setQuickDialog(null);
+    setCloseReasonId(reasonId);
+    setNextActionAt(at);
+    await handleFinish({ status: button.status, nextType: button.nextAction, nextAt: at || undefined, reasonId, keepOpen });
+    // "Enviar email": abre os templates depois de registar
+    if (keepOpen && onOpenMessages) onOpenMessages();
+  };
+
+  const handleFinish = async (o?: FinishOverride) => {
+    const status = o?.status ?? pendingStatus;
+    const nextType = o?.nextType ?? nextActionType;
+    const nextAt = o ? o.nextAt : nextActionAt;
+    const reasonId = o?.reasonId ?? closeReasonId;
+    const closing = closedStatuses.includes(status);
+
+    if (closing && !reasonId) {
       alert('Escolha um motivo de encerramento antes de guardar.');
       return;
     }
     setSaving(true);
     try {
-      const reason = closeReasons.find((r) => r.id === closeReasonId);
-      const finalNextAt = pendingStatus === 'do_not_contact' || pendingStatus === 'lost'
+      const reason = closeReasons.find((r) => r.id === reasonId);
+      const finalNextAt = status === 'do_not_contact' || status === 'lost'
         ? undefined
-        : (nextActionAt ? new Date(nextActionAt).toISOString() : undefined);
+        : (nextAt ? new Date(nextAt).toISOString() : undefined);
 
       // 1) Atualiza o lead
       const updatedLead: Lead = {
         ...lead,
-        commercialStatus: pendingStatus,
+        commercialStatus: status,
         leadScore: aiScore ?? lead.leadScore,
         contactPerson: decisionName.trim() || lead.contactPerson,
-        nextActionType: finalNextAt ? nextActionType : 'none',
+        nextActionType: finalNextAt ? nextType : 'none',
         nextActionAt: finalNextAt,
         callbackScheduledAt: finalNextAt,
         callbackStatus: finalNextAt ? 'pending' : 'completed',
-        closeReasonId: needsCloseReason ? closeReasonId : undefined,
-        closeNotes: needsCloseReason ? (reason?.name || '') : lead.closeNotes,
-        doNotContact: pendingStatus === 'do_not_contact',
+        closeReasonId: closing ? reasonId : undefined,
+        closeNotes: closing ? (reason?.name || '') : lead.closeNotes,
+        doNotContact: status === 'do_not_contact',
         contactNotes: notes.trim() || lead.contactNotes,
         lastActivityAt: new Date().toISOString()
       };
@@ -660,15 +761,20 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         leadId: lead.id,
         sellerId: lead.responsibleSellerId,
         activityType: 'call',
-        outcome: statusButtons.find((b) => b.status === pendingStatus)?.label || pendingStatus,
+        outcome: statusButtons.find((b) => b.status === status)?.label || status,
         notes: notes.trim() || undefined,
         objections: selectedObjections.length ? selectedObjections : undefined,
         interestLevel: interest,
-        nextActionType: finalNextAt ? nextActionType : 'none',
+        nextActionType: finalNextAt ? nextType : 'none',
         nextActionAt: finalNextAt,
         createdAt: new Date().toISOString()
       };
-      await crmDb.createActivity(activity);
+      const syncedActivity = await crmDb.createActivity(activity);
+      if (!syncedActivity) {
+        alert('Atencao: as notas da chamada ficaram guardadas apenas neste browser (falha ao gravar na base de dados). Verifique a ligacao e a migracao das tabelas CRM.');
+      }
+      finishedRef.current = true;
+      try { localStorage.removeItem(draftKey); } catch { /* ignore */ }
 
       // 3) Guarda decisor como contacto, se preenchido
       if (decisionName.trim()) {
@@ -686,7 +792,13 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
       }
 
       onSaved();
-      onClose();
+      if (o?.keepOpen) {
+        // continua no Play (ex.: a abrir os templates de email): limpa as notas ja registadas
+        setNotes('');
+        finishedRef.current = false;
+      } else {
+        onClose();
+      }
     } catch (err: any) {
       console.error('Erro ao concluir Play:', err);
       alert('Nao foi possivel guardar o resultado da chamada.');
@@ -813,7 +925,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                 </div>
               </>
             )}
-            <button onClick={onClose} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
+            <button onClick={handleExit} className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-bold text-gray-600 shadow-sm transition hover:bg-gray-50">
               <X className="h-4 w-4" /> Sair
             </button>
           </div>
@@ -887,6 +999,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         {/* Strip de contactos compacto */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Contactos:</span>
+          <button onClick={() => setShowPeopleFinder(true)} className="flex items-center gap-1 rounded-full border border-sky-300 bg-sky-50 px-2.5 py-0.5 text-[11px] font-bold text-sky-700 transition hover:bg-sky-100">
+            <Search className="h-3 w-3" /> Encontrar pessoas
+          </button>
           {loading ? (
             <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />
           ) : contacts.length === 0 ? (
@@ -938,6 +1053,17 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
             {selectedScript ? (
               <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-gray-800">
                 {selectedScript.content.replace(/\[NOME\]/g, sellerName)}
+              </div>
+            ) : workioScript ? (
+              <div className="space-y-2 text-[13px] leading-relaxed text-gray-700">
+                {workioScript.paragraphs.map((p, i) => <p key={i}>{p}</p>)}
+                <p className="font-semibold text-emerald-700">{workioScript.closingQuestion}</p>
+                <div className="rounded-lg border border-emerald-200 bg-white p-2.5">
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">Perguntas de qualificação</div>
+                  <ul className="space-y-0.5 text-[12px] text-gray-600">
+                    {workioScript.qualification.map((q) => <li key={q}>• {q}</li>)}
+                  </ul>
+                </div>
               </div>
             ) : (
               <div className="space-y-2 text-[13px] leading-relaxed text-gray-700">
@@ -1068,7 +1194,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3">
                 <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Checklist antes de comecar</h3>
                 <ul className="space-y-1">
-                  {demoChecklist.map((item) => (
+                  {(workioDemo?.checklist ?? demoChecklist).map((item) => (
                     <li key={item} className="flex items-center gap-2 text-[11px] text-indigo-800">
                       <CheckCircle className="h-3 w-3 shrink-0 text-indigo-400" />{item}
                     </li>
@@ -1080,7 +1206,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <h3 className="mb-2 text-[10px] font-bold uppercase tracking-wider text-gray-500">Adaptar pelo perfil do cliente</h3>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {demoAdaptations.map((a) => (
+                  {(workioDemo?.adaptations ?? demoAdaptations).map((a) => (
                     <div key={a.role} className="rounded border border-gray-200 bg-white p-2">
                       <div className="text-[10px] font-bold text-gray-700">{a.role}</div>
                       <div className="mt-0.5 text-[10px] italic text-gray-500">{a.start}</div>
@@ -1091,7 +1217,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
               {/* Fases da demo — acordeao */}
               <div className="space-y-1.5">
-                {demoPhases.map((phase) => {
+                {(workioDemo?.phases ?? demoPhases).map((phase) => {
                   const isOpen = activeDemoStep === phase.id;
                   return (
                     <div key={phase.id} className={`overflow-hidden rounded-lg border transition ${isOpen ? 'border-indigo-300 bg-indigo-50' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
@@ -1109,7 +1235,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                           {phase.route && (
                             <span className="inline-block rounded border border-indigo-300 bg-white px-2 py-0.5 font-mono text-[10px] text-indigo-700">{phase.route}</span>
                           )}
-                          {demoImages[phase.id] && (
+                          {!isWorkio && demoImages[phase.id] && (
                             <img
                               src={demoImages[phase.id]}
                               alt={phase.title}
@@ -1162,7 +1288,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                 <h3 className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-gray-400">Modulos opcionais (se sobrar tempo)</h3>
                 <div className="flex flex-wrap gap-1">
-                  {demoOptionalModules.map((m) => (
+                  {(workioDemo?.optional ?? demoOptionalModules).map((m) => (
                     <span key={m} className="rounded border border-gray-300 bg-white px-2 py-0.5 font-mono text-[10px] text-gray-600">{m}</span>
                   ))}
                 </div>
@@ -1222,23 +1348,26 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           {statusButtons.map((b) => (
             <button
               key={b.label}
-              onClick={() => applyQuickStatus(b)}
+              onClick={() => handleQuickAction(b)}
+              title={b.hint}
               className={`rounded-lg px-3 py-2 text-[11px] font-bold text-white transition ${pendingStatus === b.status ? `${b.tone} ring-2 ring-gray-400/40` : b.tone}`}
             >
               {b.label}
             </button>
           ))}
-          <button
-            onClick={() => window.open('https://sol.ecletika.com', '_blank')}
-            className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
-          >
-            <Monitor className="h-3.5 w-3.5" />
-            Abrir demo comercial
-          </button>
+          {demoUrl && (
+            <button
+              onClick={() => window.open(demoUrl, '_blank')}
+              className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+            >
+              <Monitor className="h-3.5 w-3.5" />
+              Abrir demo comercial
+            </button>
+          )}
           <div className="ml-auto flex items-center gap-3">
             <span className="text-[11px] text-gray-500">Estado final: <span className="font-bold text-gray-800">{statusButtons.find((b) => b.status === pendingStatus)?.label || pendingStatus}</span></span>
             <button
-              onClick={handleFinish}
+              onClick={() => handleFinish()}
               disabled={saving}
               className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:opacity-60"
             >
@@ -1248,6 +1377,56 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           </div>
         </div>
       </footer>
+
+      {/* ENCONTRAR PESSOAS */}
+      {showPeopleFinder && (
+        <PeopleFinderModal
+          lead={lead}
+          website={liveWebsite || lead.website}
+          targetRoles={isWorkio ? (workioSegment?.contactRole || 'Gerente / Responsável de RH') : 'Governanta-Geral / Diretor de Operações / Gerente'}
+          existingContacts={contacts}
+          onClose={() => setShowPeopleFinder(false)}
+          onChanged={() => { loadData(); }}
+        />
+      )}
+
+      {/* CONFIRMACAO DO BOTAO DE RESULTADO */}
+      {quickDialog && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30 p-4" onClick={() => setQuickDialog(null)}>
+          <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-bold text-gray-900">{quickDialog.button.label}</h3>
+            {quickDialog.button.hint && <p className="mt-1 text-[11px] text-gray-500">{quickDialog.button.hint}</p>}
+
+            {closedStatuses.includes(quickDialog.button.status) && (
+              <div className="mt-3">
+                <span className="mb-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-rose-600"><ShieldOff className="h-3 w-3" /> Motivo de encerramento *</span>
+                <select value={quickDialog.reasonId} onChange={(e) => setQuickDialog({ ...quickDialog, reasonId: e.target.value })} className={fieldClass}>
+                  <option value="">Escolher motivo</option>
+                  {closeReasons.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            {quickDialog.button.nextAction !== 'none' && (
+              <div className="mt-3">
+                <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-gray-500">Proxima accao</span>
+                <input type="datetime-local" value={quickDialog.at} onChange={(e) => setQuickDialog({ ...quickDialog, at: e.target.value })} className={`${fieldClass} font-mono`} />
+              </div>
+            )}
+
+            <p className="mt-3 text-[11px] text-gray-500">
+              {notes.trim() ? 'As notas da chamada serao gravadas no historico do lead.' : 'Sem notas escritas: so o resultado fica registado.'}
+            </p>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setQuickDialog(null)} className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-50">Cancelar</button>
+              <button onClick={confirmQuickAction} disabled={saving} className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-60">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />} Confirmar e guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* HISTORICO COMERCIAL */}
       {showHistory && (

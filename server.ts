@@ -4,9 +4,13 @@ import path from "path";
 import cors from "cors";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
+import dns from "dns";
+import net from "net";
 import { GoogleGenAI } from "@google/genai";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import * as XLSX from "xlsx";
+import { getSegment, findSegmentByText, isHotelSegment } from "./services/segments";
+import { WORKIO_PRODUCT_SUMMARY } from "./services/workioModules";
 import {
   createSellerFolders,
   listFilesInFolder,
@@ -310,6 +314,10 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     if (normalized.includes("clinica")) return "clinic";
     if (normalized.includes("loja")) return "shop";
     if (normalized.includes("cafe") || normalized.includes("cafetaria")) return "cafe";
+
+    // Segmentos Workio (ginasios, oficinas, limpezas, ...)
+    const segment = findSegmentByText(value);
+    if (segment) return segment.osmTerm;
 
     return value || "business";
   };
@@ -654,12 +662,14 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   const buildBasicLead = (leadData: any) => {
     const id = crypto.randomUUID();
     const phone = leadData.phone || leadData.allPhones?.[0];
+    const segment = getSegment(leadData.segmentId) || findSegmentByText(leadData.niche);
+    const hotel = !segment || isHotelSegment(segment.id);
 
-    return {
+    const base = {
       id,
       companyName: leadData.companyName || "Unknown",
       location: leadData.location || "Portugal",
-      niche: leadData.niche || "Hotelaria",
+      niche: !hotel && segment ? segment.label : (leadData.niche || "Hotelaria"),
       website: leadData.website,
       email: leadData.email,
       phone,
@@ -683,12 +693,12 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       status: "completed",
       potential: "Medium",
       potentialReasoning: leadData.potentialReasoning || "Lead encontrado por pesquisa gratuita em fonte aberta. A classificação detalhada requer IA configurada.",
-      contactPerson: leadData.responsibleName || "Diretor de Operações / Governanta-Geral",
-      contactNotes: leadData.explorerName
+      contactPerson: leadData.responsibleName || undefined,
+      contactNotes: "Decisor provável (cargo): Diretor de Operações / Governanta-Geral. " + (leadData.explorerName
         ? `Entidade exploradora oficial: ${leadData.explorerName}${leadData.explorerTaxId ? ` (NIF ${leadData.explorerTaxId})` : ""}. Validar contacto antes da abordagem comercial.`
         : (leadData.cnpj
           ? `CADASTUR: ${leadData.legalName || leadData.companyName} (CNPJ ${leadData.cnpj}). ${leadData.responsibleName ? `Responsável: ${leadData.responsibleName}. ` : ""}${leadData.qsaAdministrators?.length ? `QSA/administradores: ${leadData.qsaAdministrators.join(", ")}. ` : ""}Validar contacto antes da abordagem comercial.`
-          : "Validar contacto por telefone ou website antes da abordagem comercial."),
+          : "Validar contacto por telefone ou website antes da abordagem comercial.")),
       callbackStatus: "pending",
       storefront: {
         analyzed: false,
@@ -715,6 +725,27 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
       emailSequence: [],
       aiChatHistory: [],
       generatedSiteCode: null
+    };
+
+    if (hotel || !segment) return base;
+
+    // Outros segmentos: troca os textos especificos de hotelaria
+    return {
+      ...base,
+      businessActivity: leadData.businessActivity || segment.label,
+      servicesOffered: leadData.servicesOffered?.length ? leadData.servicesOffered : [segment.label],
+      contactPerson: leadData.responsibleName || undefined,
+      contactNotes: String(base.contactNotes).replace("Diretor de Operações / Governanta-Geral", segment.contactRole),
+      diagnosis: `Lead importado em modo gratuito (${segment.label}). Configure GEMINI_API_KEY para diagnóstico automático, reviews e proposta personalizada.`,
+      proposal: {
+        siteStructure: ["App do colaborador (ponto, férias, recibos)", "Painel de RH e chefias", "Relatórios automáticos"],
+        brandingSuggestion: `Workio para ${segment.label}`,
+        techStack: "Web + App Mobile",
+        problems: segment.painPoints,
+        solutionFeatures: ["Controlo de ponto no telemóvel (QR, rosto ou digital)", "Escalas gráficas e banco de horas automático", "Férias, ausências e relatórios sem folhas de cálculo"],
+        expectedBenefits: ["Menos tempo de RH em tarefas manuais", "Faltas e atrasos visíveis no próprio dia", "Dados prontos para o processamento salarial"],
+        estimatedValue: "Desde 3,90 € por colaborador / mês"
+      }
     };
   };
 
@@ -1279,7 +1310,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
   // Route: searchLeads
   app.post('/api/gemini/searchLeads', async (req, res) => {
     try {
-      const { country, location, niche, aiContext, campaignName, excludeNames } = req.body;
+      const { country, location, niche, aiContext, campaignName, excludeNames, segmentId } = req.body;
+      const searchSegment = getSegment(segmentId);
 
       // Nomes ja conhecidos/mostrados/descartados: nunca devem voltar
       const excludedSet = new Set(
@@ -1324,7 +1356,10 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         searchIntent = `Find businesses related to: "${fallback}" in Portugal`;
       }
 
-      const extraContext = aiContext ? `Additional Context: ${aiContext}` : "";
+      const extraContext = [
+        aiContext ? `Additional Context: ${aiContext}` : "",
+        searchSegment ? `Target segment: ${searchSegment.label} (${searchSegment.aiHint}).` : ""
+      ].filter(Boolean).join("\n        ");
 
       // Lista de exclusao: empresas ja conhecidas que NAO devem voltar
       const excludeList = Array.from(excludedSet) as string[];
@@ -1384,6 +1419,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
           website: item.website || undefined,
           location: item.address || location || "Portugal",
           niche: niche || "General",
+          segmentId: searchSegment?.id,
           socials: [],
           allPhones: []
         }));
@@ -1693,7 +1729,56 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
 
       const ai = getGeminiClient();
 
-      const prompt = `
+      // Segmento Workio (por omissao: hotelaria, comportamento anterior)
+      const segment = getSegment(leadData.segmentId) || findSegmentByText(leadData.niche);
+      const isHotel = !segment || isHotelSegment(segment.id);
+
+      const segmentPrompt = segment && !isHotel ? `
+        AUDIT TARGET: "${leadData.companyName}" in "${leadData.location}".
+        URL: ${leadData.website || "No URL provided"}
+
+        LANGUAGE: STRICTLY EUROPEAN PORTUGUESE (pt-PT).
+
+        CONTEXT: ${WORKIO_PRODUCT_SUMMARY}
+        TARGET SEGMENT: ${segment.label} (${segment.aiHint}).
+        TYPICAL PAINS IN THIS SEGMENT: ${segment.painPoints.join("; ")}.
+        MOST RELEVANT WORKIO MODULES: ${segment.keyModules.join(", ")}.
+
+        TASK 1: BUSINESS AUDIT
+        - Confirm the business is real and active (use search/maps). If it is clearly not a "${segment.label}" business, set "valid" to false.
+        - Estimate the number of employees and number of locations/shifts (${segment.unitLabel}). Workio fits companies with enough staff to need time tracking, scheduling and HR admin (typically 10+ employees). Companies with 50+ employees are legally required to have a whistleblowing channel (Lei 93/2021).
+        - Look for signs of HR/workforce pain: many staff or shifts, hiring ads, high turnover in reviews, multiple sites, regulated safety requirements.
+        - Infer the most likely decision maker role (e.g. ${segment.contactRole}). Do NOT invent a personal name unless found in a public source.
+
+        TASK 2: WORKIO FIT CLASSIFICATION
+        - **HOT**: 20+ employees, shift work or multiple sites, active hiring, or clear HR/compliance pressure.
+        - **COLD**: very small team (under ~8) or evidence of an existing HR/time-tracking system.
+        - **MEDIUM**: otherwise.
+
+        OUTPUT JSON:
+        {
+          "valid": boolean,
+          "nif": "string",
+          "cae": "string",
+          "websiteScore": number,
+          "mapsRating": number,
+          "mapsReviews": number,
+          "openingHours": ["string"],
+          "services": ["string"],
+          "reviews": [{"author": "Name", "rating": 5, "text": "..."}],
+          "diagnosis": "string (pt-PT)",
+          "potential": "Hot" | "Medium" | "Cold",
+          "reasoning": "string (pt-PT) - why this business fits Workio, citing evidence",
+          "problems": ["string"],
+          "solutionFeatures": ["string"],
+          "expectedBenefits": ["string"],
+          "contactPerson": "string - real full name ONLY if found in a public source, otherwise empty string",
+          "contactRole": "string - most likely decision-maker role, e.g. ${segment.contactRole}",
+          "contactNotes": "string (pt-PT - size, positioning and suggested pitch for ${segment.label})"
+        }
+      ` : null;
+
+      const prompt = segmentPrompt || `
         AUDIT TARGET: "${leadData.companyName}" in "${leadData.location}".
         URL: ${leadData.website || "No URL provided"}
 
@@ -1702,7 +1787,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         TASK 1: HOTEL/ACCOMMODATION OPERATION AUDIT
         - Analyze if the establishment possesses an active hotel/guesthouse operation.
         - Check reviews for mention of "limpeza" (cleanliness), "arrumação" (room tidy), "higiene" (hygiene), "tempo de espera para quarto" (wait time).
-        - Infer a specific and highly plausible Persona/Contact Person with a realistic generic Portuguese/Angolan Portuguese name (e.g., "Dra. Paula Albuquerque (Governanta-Geral)" or "Carlos Fernandes (Diretor de Alojamentos)") based on standard industry directories or corporate roles.
+        - Identify the most likely DECISION-MAKER ROLE (e.g. "Governanta-Geral", "Diretor de Alojamentos"). NEVER invent a personal name: give a full name only if it appears in a public source you actually found, otherwise leave it empty.
 
         TASK 2: HOUSEKEEPING PAIN INDEX & CLASSIFICATION
         - **HOT**: Bad reviews regarding cleanliness, slow check-in/turnaround, or large size showing clear logistics struggles.
@@ -1726,7 +1811,8 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
           "problems": ["string"],
           "solutionFeatures": ["string"],
           "expectedBenefits": ["string"],
-          "contactPerson": "string (realistic name + role, e.g. Maria Clara Sousa (Governanta-Geral))",
+          "contactPerson": "string - real full name ONLY if found in a public source, otherwise empty string",
+          "contactRole": "string - most likely decision-maker role, no personal name",
           "contactNotes": "string (pt-PT - summary of hotel size, positioning, and target pitch)"
         }
       `;
@@ -1748,7 +1834,7 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         id,
         companyName: leadData.companyName || "Unknown",
         location: leadData.location || "Unknown",
-        niche: leadData.niche || "Hotelaria",
+        niche: segment && !isHotel ? segment.label : (leadData.niche || "Hotelaria"),
         website: leadData.website,
         email: leadData.email,
         phone: primaryPhone,
@@ -1768,19 +1854,29 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
         status: 'completed',
         potential: data.potential || 'Medium',
         potentialReasoning: data.reasoning || "Análise de limpeza e governança concluída.",
-        contactPerson: data.contactPerson || "Governanta-Geral",
-        contactNotes: data.contactNotes || "Hotel com potencial para modernização operacional do departamento de andares.",
+        // Nunca um nome inventado: so um nome encontrado numa fonte publica; o cargo vai nas notas
+        contactPerson: (typeof data.contactPerson === "string" && data.contactPerson.trim()) || undefined,
+        contactNotes: `Decisor provável (cargo): ${data.contactRole || (segment && !isHotel ? segment.contactRole : "Governanta-Geral / Diretor de Operações")}. ` +
+          (data.contactNotes || (segment && !isHotel ? `${segment.label}: ${segment.pitch}` : "Hotel com potencial para modernização operacional do departamento de andares.")),
         callbackStatus: 'pending',
         storefront: {
           analyzed: true,
           signageCondition: 'Unknown',
           visualAppeal: 'Medium',
           needsLedUpgrade: false,
-          description: "Estrutura do hotel analisada remotamente via fotos de satélite e Maps.",
+          description: segment && !isHotel ? "Análise remota via Maps e website." : "Estrutura do hotel analisada remotamente via fotos de satélite e Maps.",
           address: leadData.location || "Portugal"
          },
-        diagnosis: data.diagnosis || "Pronto para contacto de apresentação do software de Housekeeping.",
-        proposal: {
+        diagnosis: data.diagnosis || (segment && !isHotel ? `Pronto para contacto de apresentação do Workio (${segment.label}).` : "Pronto para contacto de apresentação do software de Housekeeping."),
+        proposal: segment && !isHotel ? {
+          siteStructure: ["App do colaborador (ponto, férias, recibos)", "Painel de RH e chefias", "Relatórios automáticos"],
+          brandingSuggestion: `Workio para ${segment.label}`,
+          techStack: "Web + App Mobile",
+          problems: data.problems || segment.painPoints,
+          solutionFeatures: data.solutionFeatures || ["Controlo de ponto no telemóvel (QR, rosto ou digital)", "Escalas gráficas e banco de horas automático", "Férias, ausências e relatórios sem folhas de cálculo"],
+          expectedBenefits: data.expectedBenefits || ["Menos tempo de RH em tarefas manuais", "Faltas e atrasos visíveis no próprio dia", "Dados prontos para o processamento salarial"],
+          estimatedValue: "Desde 3,90 € por colaborador / mês"
+        } : {
           siteStructure: ["Aplicação Móvel das Empregadas", "Painel Administrativo da Governanta", "Ecrã de Status da Receção"],
           brandingSuggestion: "Digitalização de Housekeeping",
           techStack: "React Native + Web Panel Dashboard",
@@ -2139,6 +2235,435 @@ LeadScope AI - Oportunidade gerada a ${new Date().toLocaleDateString("pt-PT")}.`
     } catch (err: any) {
       console.error('[Places] search error:', err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ── PESSOAS — procura em fontes PUBLICAS do website da empresa ─────────────
+  // Nunca inventa: so devolve nomes/cargos/emails que aparecem escritos nas paginas
+  // (e valida o que a IA extrai contra o texto real da pagina).
+  const isPrivateIp = (ip: string): boolean => {
+    if (net.isIPv4(ip)) {
+      const [a, b] = ip.split(".").map(Number);
+      return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 100 && b >= 64 && b <= 127);
+    }
+    if (net.isIPv6(ip)) {
+      const v = ip.toLowerCase();
+      if (v === "::1" || v === "::") return true;
+      if (v.startsWith("fc") || v.startsWith("fd") || v.startsWith("fe80")) return true;
+      const mapped = v.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+      return mapped ? isPrivateIp(mapped[1]) : false;
+    }
+    return true;
+  };
+
+  const isPublicHost = async (hostname: string): Promise<boolean> => {
+    if (!hostname || hostname === "localhost" || hostname.endsWith(".local") || hostname.endsWith(".internal")) return false;
+    if (net.isIP(hostname)) return !isPrivateIp(hostname);
+    try {
+      const addrs = await dns.promises.lookup(hostname, { all: true });
+      return addrs.length > 0 && addrs.every((a) => !isPrivateIp(a.address));
+    } catch {
+      return false;
+    }
+  };
+
+  const PEOPLE_MAX_BYTES = 1_500_000;
+
+  // GET de uma pagina publica, com limites (tempo, tamanho, redirects, so portas 80/443)
+  const safeFetchHtml = async (startUrl: string): Promise<{ url: string; html: string } | null> => {
+    let current = startUrl;
+    for (let hop = 0; hop < 4; hop++) {
+      let u: URL;
+      try { u = new URL(current); } catch { return null; }
+      if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+      if (u.port && u.port !== "80" && u.port !== "443") return null;
+      if (!(await isPublicHost(u.hostname))) return null;
+
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      try {
+        const r = await fetch(u.toString(), {
+          redirect: "manual",
+          signal: ctrl.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; WorkioBot/1.0)", Accept: "text/html,application/xhtml+xml" }
+        });
+        if (r.status >= 300 && r.status < 400 && r.headers.get("location")) {
+          current = new URL(r.headers.get("location") as string, u).toString();
+          continue;
+        }
+        if (!r.ok) return null;
+        if (!String(r.headers.get("content-type") || "").includes("html")) return null;
+        const buf = Buffer.from(await r.arrayBuffer());
+        return { url: u.toString(), html: buf.subarray(0, PEOPLE_MAX_BYTES).toString("utf8") };
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+    return null;
+  };
+
+  const htmlToText = (html: string): string =>
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<(br|\/p|\/div|\/li|\/h\d|\/tr)[^>]*>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&#64;|&commat;/g, "@")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n\s*\n+/g, "\n")
+      .trim();
+
+  const GENERIC_EMAIL_PREFIXES = ["info", "geral", "reservas", "reservations", "booking", "contacto", "contactos", "contact", "comercial", "sales", "recepcao", "receção", "reception", "administrativo", "hello", "ola", "olá", "suporte", "support", "marketing", "rh", "office", "mail", "geral"];
+
+  const extractEmails = (html: string, text: string): string[] => {
+    const found = new Set<string>();
+    const re = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+    for (const m of (html + " " + text).match(re) || []) {
+      const e = m.toLowerCase();
+      if (/\.(png|jpe?g|gif|svg|webp|css|js)$/.test(e)) continue;
+      if (/(example|sentry|wixpress|domain\.com|email\.com|yourdomain)/.test(e)) continue;
+      found.add(e);
+    }
+    return Array.from(found);
+  };
+
+  const extractPtPhones = (text: string): string[] => {
+    const found = new Set<string>();
+    const re = /(?:\+?351[\s.-]?)?(?:2\d[\s.-]?\d{3}[\s.-]?\d{4}|9[1236]\d[\s.-]?\d{3}[\s.-]?\d{3})/g;
+    for (const m of text.match(re) || []) {
+      const digits = m.replace(/\D/g, "").replace(/^351/, "");
+      if (digits.length === 9 && /^[29]/.test(digits)) found.add(`+351 ${digits}`);
+    }
+    return Array.from(found);
+  };
+
+  const PEOPLE_PAGE_PATHS = ["", "/equipa", "/a-equipa", "/a-nossa-equipa", "/team", "/sobre", "/sobre-nos", "/quem-somos", "/about", "/about-us", "/contactos", "/contacto", "/contact"];
+
+  // POST /api/people/find — { companyName, website }
+  app.post('/api/people/find', async (req, res) => {
+    try {
+      const { companyName, website } = req.body as { companyName?: string; website?: string };
+      if (!website || !String(website).trim()) {
+        return res.json({ people: [], emails: [], phones: [], pagesChecked: 0, notes: ["Este lead não tem website: não há página pública para analisar."] });
+      }
+
+      let base: URL;
+      try {
+        base = new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`);
+      } catch {
+        return res.status(400).json({ error: "Website inválido." });
+      }
+
+      const pages: { url: string; html: string; text: string }[] = [];
+      const seen = new Set<string>();
+      for (const p of PEOPLE_PAGE_PATHS) {
+        if (pages.length >= 6) break;
+        const target = new URL(p || "/", base).toString();
+        if (seen.has(target)) continue;
+        seen.add(target);
+        const got = await safeFetchHtml(target);
+        if (got && !pages.some((x) => x.url === got.url)) {
+          pages.push({ url: got.url, html: got.html, text: htmlToText(got.html).slice(0, 12000) });
+        }
+      }
+
+      const notes: string[] = [];
+      if (pages.length === 0) {
+        return res.json({ people: [], emails: [], phones: [], pagesChecked: 0, notes: ["Não foi possível abrir o website (indisponível ou bloqueado)."] });
+      }
+
+      const allText = pages.map((p) => p.text).join("\n");
+      const emailSet = new Map<string, string>();
+      const phoneSet = new Map<string, string>();
+      for (const p of pages) {
+        for (const e of extractEmails(p.html, p.text)) if (!emailSet.has(e)) emailSet.set(e, p.url);
+        for (const ph of extractPtPhones(p.text)) if (!phoneSet.has(ph)) phoneSet.set(ph, p.url);
+      }
+      const emails = Array.from(emailSet.entries()).map(([email, sourceUrl]) => {
+        const local = email.split("@")[0];
+        return { email, sourceUrl, kind: GENERIC_EMAIL_PREFIXES.includes(local) ? "generic" : "personal" };
+      });
+      const phones = Array.from(phoneSet.entries()).map(([phone, sourceUrl]) => ({ phone, sourceUrl }));
+
+      // Pessoas: so se houver IA; valida cada resultado contra o texto real
+      let people: any[] = [];
+      if (!process.env.GEMINI_API_KEY) {
+        notes.push("IA não configurada: só foram extraídos emails e telefones. Os nomes exigem GEMINI_API_KEY.");
+      } else {
+        try {
+          const ai = getGeminiClient();
+          const corpus = pages.map((p) => `### PÁGINA ${p.url}\n${p.text}`).join("\n\n").slice(0, 40000);
+          const prompt = `
+            Extrai APENAS pessoas que aparecem escritas, com nome próprio, nas páginas abaixo da empresa "${companyName || ""}".
+            REGRAS:
+            - NUNCA inventes, deduzas ou completes nomes, cargos ou emails. Se não está escrito, não incluas.
+            - Só pessoas associadas à empresa (equipa, direção, gerência, contactos). Ignora autores de reviews, clientes e figuras públicas.
+            - "evidence" é uma citação CURTA e literal do texto onde a pessoa aparece.
+            Devolve um ARRAY JSON (pode ser vazio): [{"name":"","role":"","email":"","phone":"","sourceUrl":"","evidence":""}]
+
+            ${corpus}
+          `;
+          const response = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: prompt,
+            config: { thinkingConfig: { thinkingBudget: 0 } }
+          });
+          const parsed = extractJson(response.text || "[]");
+          const hay = allText.toLowerCase();
+          const normalizedEmails = new Set(emails.map((e) => e.email));
+          if (Array.isArray(parsed)) {
+            const dedupe = new Set<string>();
+            for (const item of parsed) {
+              const name = String(item?.name || "").trim();
+              if (name.length < 5 || !name.includes(" ")) continue;
+              if (!hay.includes(name.toLowerCase())) continue; // nome tem de existir no texto
+              if (dedupe.has(name.toLowerCase())) continue;
+              dedupe.add(name.toLowerCase());
+              const role = String(item?.role || "").trim();
+              const roleOk = role && hay.includes(role.toLowerCase());
+              const email = String(item?.email || "").trim().toLowerCase();
+              people.push({
+                name,
+                role: roleOk ? role : undefined,
+                email: normalizedEmails.has(email) ? email : undefined,
+                phone: item?.phone && allText.includes(String(item.phone)) ? String(item.phone) : undefined,
+                source: "website",
+                sourceUrl: pages.some((p) => p.url === item?.sourceUrl) ? item.sourceUrl : pages[0].url,
+                confidence: roleOk ? "probable" : "unverified",
+                evidence: String(item?.evidence || "").slice(0, 240)
+              });
+              if (people.length >= 15) break;
+            }
+          }
+          if (people.length === 0) notes.push("Nenhuma pessoa com nome foi encontrada nas páginas públicas.");
+        } catch (err: any) {
+          console.warn("[People] extraction failed:", err?.message);
+          notes.push("A extração por IA falhou; só foram extraídos emails e telefones.");
+        }
+      }
+
+      res.json({ people, emails, phones, pagesChecked: pages.length, notes });
+    } catch (err: any) {
+      console.error("[People] find error:", err);
+      res.status(500).json({ error: err.message || "Erro ao procurar pessoas." });
+    }
+  });
+
+  // ── APOLLO — empresas e pessoas, com teto mensal de creditos ───────────────
+  // A chave (CLIENT_API_APOLLO) vive so no servidor. Cada pedido reserva creditos no
+  // contador ANTES de chamar o Apollo; atingido o teto, nenhum pedido sai.
+  // NOTA: o contador e interno (o que ESTA app gastou); nao le o saldo real do Apollo.
+  const APOLLO_BASE = "https://api.apollo.io/api/v1";
+  const APOLLO_MONTHLY_LIMIT = 75;
+  const apolloKey = () => process.env.CLIENT_API_APOLLO?.trim();
+
+  async function getApolloUsage(): Promise<number | null> {
+    const admin = getSupabaseAdmin();
+    if (!admin) return null;
+    const { data, error } = await admin
+      .from('api_usage')
+      .select('count')
+      .eq('period', placesPeriod())
+      .eq('service', 'apollo')
+      .maybeSingle();
+    if (error) return null;
+    return data?.count ?? 0;
+  }
+
+  async function setApolloUsage(count: number): Promise<boolean> {
+    const admin = getSupabaseAdmin();
+    if (!admin) return false;
+    const { error } = await admin
+      .from('api_usage')
+      .upsert({ period: placesPeriod(), service: 'apollo', count: Math.max(0, count), updated_at: new Date().toISOString() }, { onConflict: 'period,service' });
+    return !error;
+  }
+
+  type ApolloGate = { ok: true; used: number } | { ok: false; status: number; error: string; used?: number };
+
+  // Reserva `cost` creditos. Falha fechada: sem contador, nao ha pedidos.
+  async function apolloReserve(cost: number): Promise<ApolloGate> {
+    if (!apolloKey()) return { ok: false, status: 503, error: "Apollo não configurado (falta a variável CLIENT_API_APOLLO)." };
+    const used = await getApolloUsage();
+    if (used === null) return { ok: false, status: 503, error: "Contador de créditos indisponível: pedidos ao Apollo bloqueados por segurança." };
+    if (used >= APOLLO_MONTHLY_LIMIT || used + cost > APOLLO_MONTHLY_LIMIT) {
+      return { ok: false, status: 429, used, error: `Limite mensal do Apollo atingido (${used}/${APOLLO_MONTHLY_LIMIT} créditos). Novos pedidos só no próximo mês.` };
+    }
+    if (cost > 0 && !(await setApolloUsage(used + cost))) {
+      return { ok: false, status: 503, error: "Não foi possível registar o consumo de créditos: pedido bloqueado." };
+    }
+    return { ok: true, used: used + cost };
+  }
+
+  // Chama o Apollo. Pedido falhado devolve os creditos reservados; se a resposta indicar
+  // `credits_consumed`, ajusta o contador ao valor real.
+  async function apolloCall(path: string, body: any, reservedCost: number): Promise<{ status: number; data: any; used: number }> {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    let used = (await getApolloUsage()) ?? 0;
+    try {
+      const r = await fetch(`${APOLLO_BASE}${path}`, {
+        method: "POST",
+        signal: ctrl.signal,
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-cache", "x-api-key": apolloKey() as string },
+        body: JSON.stringify(body)
+      });
+      const data: any = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        if (reservedCost > 0) { used = Math.max(0, used - reservedCost); await setApolloUsage(used); }
+      } else if (typeof data?.credits_consumed === "number" && data.credits_consumed !== reservedCost) {
+        used = Math.max(0, used + (data.credits_consumed - reservedCost));
+        await setApolloUsage(used);
+      }
+      return { status: r.status, data, used };
+    } catch (err) {
+      if (reservedCost > 0) { used = Math.max(0, used - reservedCost); await setApolloUsage(used); }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const apolloUsagePayload = (used: number) => ({
+    used,
+    limit: APOLLO_MONTHLY_LIMIT,
+    remaining: Math.max(APOLLO_MONTHLY_LIMIT - used, 0),
+    period: placesPeriod()
+  });
+
+  const apolloErrorMessage = (status: number, data: any) =>
+    status === 401 || status === 403 ? "Chave do Apollo recusada. Verifique a variável CLIENT_API_APOLLO."
+      : status === 429 ? "Apollo: limite de pedidos atingido. Tente mais tarde."
+      : `Erro do Apollo (${status})${data?.error ? `: ${String(data.error).slice(0, 120)}` : "."}`;
+
+  // GET /api/apollo/usage — estado da barra de creditos
+  app.get('/api/apollo/usage', async (_req, res) => {
+    const configured = Boolean(apolloKey());
+    const used = await getApolloUsage();
+    res.json({
+      configured,
+      counterAvailable: used !== null,
+      ...apolloUsagePayload(used ?? 0)
+    });
+  });
+
+  // POST /api/apollo/companies — pesquisa de empresas (conta 1 credito por pedido, por precaucao)
+  app.post('/api/apollo/companies', async (req, res) => {
+    try {
+      const { country, location, niche, segmentId, excludeNames } = req.body as any;
+      const gate = await apolloReserve(1);
+      if (!gate.ok) return res.status(gate.status).json({ error: gate.error, usage: gate.used !== undefined ? apolloUsagePayload(gate.used) : undefined });
+
+      const countryName = ({ PT: "Portugal", AO: "Angola", BR: "Brazil" } as Record<string, string>)[String(country || "PT").toUpperCase()] || "Portugal";
+      const places = splitLocations(String(location || ""), "", "").slice(0, 5);
+      const segment = getSegment(segmentId) || findSegmentByText(niche);
+      const keyword = segment?.osmTerm || String(niche || "").trim();
+
+      const body: any = {
+        organization_locations: (places.length ? places : [countryName]).map((p: string) => (p.toLowerCase().includes(countryName.toLowerCase()) ? p : `${p}, ${countryName}`)),
+        per_page: 10,
+        page: 1
+      };
+      if (keyword) body.q_organization_keyword_tags = [keyword];
+      // Workio e para empresas com equipa; o SOL (hotelaria) nao filtra por tamanho
+      if (segment && !isHotelSegment(segment.id)) body.organization_num_employees_ranges = ["11,50", "51,200", "201,500"];
+
+      const { status, data, used } = await apolloCall("/mixed_companies/search", body, 1);
+      if (status < 200 || status >= 300) return res.status(502).json({ error: apolloErrorMessage(status, data), usage: apolloUsagePayload(used) });
+
+      const excluded = new Set((Array.isArray(excludeNames) ? excludeNames : []).map((n: any) => String(n || "").trim().toLowerCase()));
+      const orgs: any[] = data.organizations || data.accounts || [];
+      const leads = orgs
+        .filter((o) => o?.name && !excluded.has(String(o.name).trim().toLowerCase()))
+        .map((o) => {
+          const phone = o.phone || o.primary_phone?.number || o.sanitized_phone || undefined;
+          return {
+            companyName: o.name,
+            website: o.website_url || (o.primary_domain ? `https://${o.primary_domain}` : undefined),
+            location: [o.street_address, o.city, o.state, o.country].filter(Boolean).join(", ") || countryName,
+            phone,
+            allPhones: phone ? [phone] : [],
+            niche: niche || segment?.searchTerm || "Empresas",
+            segmentId: segment?.id,
+            employees: o.estimated_num_employees ? `${o.estimated_num_employees} colaboradores (estimativa Apollo)` : undefined,
+            socials: [],
+            country: String(country || "PT").toUpperCase(),
+            dataSource: "Apollo"
+          };
+        });
+
+      res.json({ leads, usage: apolloUsagePayload(used) });
+    } catch (err: any) {
+      console.error("[Apollo] companies error:", err?.message);
+      res.status(500).json({ error: "Erro ao falar com o Apollo." });
+    }
+  });
+
+  // POST /api/apollo/people — decisores de uma empresa (pesquisa sem emails: 0 creditos segundo a doc)
+  app.post('/api/apollo/people', async (req, res) => {
+    try {
+      const { domain, titles } = req.body as { domain?: string; titles?: string[] };
+      const cleanDomain = String(domain || "").trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+      if (!cleanDomain) return res.status(400).json({ error: "Falta o domínio da empresa (website)." });
+
+      const gate = await apolloReserve(0);
+      if (!gate.ok) return res.status(gate.status).json({ error: gate.error, usage: gate.used !== undefined ? apolloUsagePayload(gate.used) : undefined });
+
+      const body: any = { q_organization_domains_list: [cleanDomain], per_page: 10, page: 1 };
+      if (Array.isArray(titles) && titles.length) body.person_titles = titles.slice(0, 12);
+
+      const { status, data, used } = await apolloCall("/mixed_people/api_search", body, 0);
+      if (status < 200 || status >= 300) return res.status(502).json({ error: apolloErrorMessage(status, data), usage: apolloUsagePayload(used) });
+
+      const people = ((data.people || data.contacts || []) as any[])
+        .filter((p) => p?.id)
+        .map((p) => ({
+          id: String(p.id),
+          name: [p.first_name, p.last_name || p.last_name_obfuscated].filter(Boolean).join(" ").trim() || "(nome oculto)",
+          title: p.title || undefined,
+          organization: p.organization?.name || undefined,
+          hasEmail: Boolean(p.has_email),
+          linkedinUrl: p.linkedin_url || undefined
+        }));
+
+      res.json({ people, usage: apolloUsagePayload(used) });
+    } catch (err: any) {
+      console.error("[Apollo] people error:", err?.message);
+      res.status(500).json({ error: "Erro ao falar com o Apollo." });
+    }
+  });
+
+  // POST /api/apollo/reveal — revela o email profissional de UMA pessoa (gasta creditos)
+  app.post('/api/apollo/reveal', async (req, res) => {
+    try {
+      const { personId } = req.body as { personId?: string };
+      if (!personId) return res.status(400).json({ error: "Falta a pessoa a revelar." });
+
+      const gate = await apolloReserve(1);
+      if (!gate.ok) return res.status(gate.status).json({ error: gate.error, usage: gate.used !== undefined ? apolloUsagePayload(gate.used) : undefined });
+
+      // Sem emails pessoais: so o contacto profissional
+      const { status, data, used } = await apolloCall("/people/match", { id: String(personId), reveal_personal_emails: false }, 1);
+      if (status < 200 || status >= 300) return res.status(502).json({ error: apolloErrorMessage(status, data), usage: apolloUsagePayload(used) });
+
+      const p = data.person || {};
+      res.json({
+        person: {
+          name: [p.first_name, p.last_name].filter(Boolean).join(" ").trim() || undefined,
+          title: p.title || undefined,
+          email: p.email || undefined,
+          emailStatus: p.email_status || undefined,
+          linkedinUrl: p.linkedin_url || undefined
+        },
+        usage: apolloUsagePayload(used)
+      });
+    } catch (err: any) {
+      console.error("[Apollo] reveal error:", err?.message);
+      res.status(500).json({ error: "Erro ao falar com o Apollo." });
     }
   });
 

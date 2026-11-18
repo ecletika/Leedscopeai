@@ -211,6 +211,8 @@ export interface Lead {
   country?: string;
   niche: string;
   segment?: string;
+  /** Segmento de mercado Workio usado na prospeccao (ver services/segments.ts). Transitorio: o nicho persistido e `niche`. */
+  segmentId?: string;
   estimatedRooms?: number;
   website?: string;
   email?: string;

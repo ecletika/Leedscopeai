@@ -28,7 +28,8 @@ export const searchLeadsInLocation = async (
   niche: string,
   aiContext: string,
   campaignName: string,
-  excludeNames: string[] = []
+  excludeNames: string[] = [],
+  segmentId?: string
 ): Promise<Partial<Lead>[]> => {
   try {
     const response = await fetch('/api/gemini/searchLeads', {
@@ -36,7 +37,7 @@ export const searchLeadsInLocation = async (
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ country, location, niche, aiContext, campaignName, excludeNames })
+      body: JSON.stringify({ country, location, niche, aiContext, campaignName, excludeNames, segmentId })
     });
 
     if (!response.ok) {
