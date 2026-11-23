@@ -22,11 +22,18 @@ import {
   Wallet,
   XCircle
 } from 'lucide-react';
+import { CommercialSystem } from '../types';
+import ProductSwitch from './sales/ProductSwitch';
+import { EmptyState } from './sales/ui';
 import { SEGMENTS } from '../services/segments';
 import { WORKIO_AREAS, WORKIO_MODULES, WORKIO_PLANS, WorkioPlan, formatPlanPrice, modulesByArea, planModuleCodes } from '../services/workioModules';
 
 /*
- * Academia Workio — formação comercial.
+ * Academia — formação comercial, separada por sistema (Workio, SOL, EMET).
+ * Cada curso pertence a um sistema (campo `product`); para criar a academia de um
+ * sistema novo basta acrescentar cursos a SYSTEMS com o `product` respetivo.
+ *
+ * Academia Workio:
  *
  * O conteúdo do Workio sai do próprio Workio (repositório ecletika/workio):
  * planos e módulos de src/lib/modulos/catalogo.ts, argumentos e perguntas
@@ -44,6 +51,8 @@ interface Lesson {
 
 interface AcademySystem {
   id: string;
+  /** Sistema a que o curso pertence: define em que academia aparece */
+  product: CommercialSystem;
   name: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -387,6 +396,7 @@ const AREA_SYSTEMS: AcademySystem[] = WORKIO_AREAS.map((area) => {
   const mods = modulesByArea(area.id);
   return {
     id: `workio-${area.id}`,
+    product: 'workio',
     name: `Workio · ${area.name}`,
     description: `${area.tagline} ${mods.length} módulos.`,
     icon: AREA_ICONS[area.id] || Layers,
@@ -413,6 +423,7 @@ const AREA_SYSTEMS: AcademySystem[] = WORKIO_AREAS.map((area) => {
 const SYSTEMS: AcademySystem[] = [
   {
     id: 'workio',
+    product: 'workio',
     name: 'Workio · Visão geral',
     description: 'O produto, a lei, os planos, as objeções e a demonstração.',
     icon: Layers,
@@ -428,13 +439,14 @@ const SYSTEMS: AcademySystem[] = [
   ...AREA_SYSTEMS,
   {
     id: 'sol',
+    product: 'sol',
     name: 'SOL · Hotelaria',
     description: 'Formação do sistema de housekeeping e operação hoteleira.',
     icon: Building2,
     lessons: SOL_LESSONS,
     checklist: [
       'Assistiu à formação do SOL (estas lições)',
-      'Fez pelo menos uma simulação no Simulador IA',
+      'Seguiu o roteiro da demo nas Ferramentas de venda',
       'Conhece os módulos principais do SOL',
       'Sabe qualificar um lead',
       'Sabe marcar uma demo',
@@ -444,7 +456,8 @@ const SYSTEMS: AcademySystem[] = [
   },
   {
     id: 'segmentos',
-    name: 'Vender por segmento',
+    product: 'workio',
+    name: 'Workio · Vender por segmento',
     description: 'Dores, decisor e pitch para cada mercado (rascunho a validar pela equipa).',
     icon: Target,
     lessons: SEGMENT_LESSONS,
@@ -491,6 +504,7 @@ type Tab = 'cursos' | 'planos' | 'teste';
 
 export default function Academy() {
   const [tab, setTab] = useState<Tab>('cursos');
+  const [product, setProduct] = useState<CommercialSystem>('workio');
   const [systemId, setSystemId] = useState<string>(SYSTEMS[0].id);
   const [open, setOpen] = useState<number | null>(0);
   const [progress, setProgress] = useState<Progress>(loadProgress);
@@ -503,7 +517,15 @@ export default function Academy() {
   const [answers, setAnswers] = useState<(number | null)[]>(QUIZ.map(() => null));
   const [submitted, setSubmitted] = useState(false);
 
-  const system = useMemo(() => SYSTEMS.find((s) => s.id === systemId) || SYSTEMS[0], [systemId]);
+  // Cada sistema tem a sua academia: so aparecem os cursos do sistema escolhido
+  const courses = useMemo(() => SYSTEMS.filter((s) => s.product === product), [product]);
+  const system = useMemo(() => courses.find((s) => s.id === systemId) || courses[0] || SYSTEMS[0], [courses, systemId]);
+  const changeProduct = (p: CommercialSystem) => {
+    setProduct(p);
+    setSystemId(SYSTEMS.find((s) => s.product === p)?.id || '');
+    setTab('cursos');
+    setOpen(0);
+  };
   const isWorkio = system.id === 'workio';
 
   useEffect(() => {
@@ -555,26 +577,56 @@ export default function Academy() {
     { id: 'teste', label: `Teste final${quizPassed ? ' ✓' : ''}`, icon: <ClipboardCheck className="h-3.5 w-3.5" /> }
   ];
 
+  // Planos/simulador e teste final so existem na academia do Workio
+  const visibleTabs = TABS.filter((t) => product === 'workio' || t.id === 'cursos');
+
+  const productIntro: Record<CommercialSystem, string> = {
+    workio: 'Formação para vender o Workio com rigor, mesmo sendo novo na equipa. O conteúdo vem do próprio Workio e dos seus manuais.',
+    sol: 'Formação para vender o SOL, o sistema de housekeeping e operação hoteleira.',
+    emet: 'Formação para vender o EMET.'
+  };
+
+  const header = (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h2 className="flex items-center gap-2 text-xl font-bold text-white"><GraduationCap className="h-5 w-5 text-emerald-500" /> Academia</h2>
+        <p className="mt-1 max-w-2xl text-xs text-gray-400">{productIntro[product]}</p>
+      </div>
+      <ProductSwitch value={product} onChange={changeProduct} />
+    </div>
+  );
+
+  if (courses.length === 0) {
+    return (
+      <div className="space-y-5">
+        {header}
+        <EmptyState
+          title="A academia do EMET ainda não tem cursos"
+          text="Quando o plano de venda do EMET estiver fechado, os cursos, o roteiro e o teste do EMET aparecem aqui, separados da academia do Workio e do SOL."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="flex items-center gap-2 text-xl font-bold text-white"><GraduationCap className="h-5 w-5 text-emerald-500" /> Academia Workio</h2>
-        <p className="mt-1 text-xs text-gray-400">Formação para vender o Workio e os seus sistemas com rigor, mesmo sendo novo na equipa. O conteúdo do Workio vem do próprio Workio e dos seus manuais.</p>
-      </div>
+      {header}
 
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((t) => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${tab === t.id ? 'border-emerald-500/30 bg-emerald-600/10 text-emerald-400' : 'border-gray-800 text-gray-400 hover:bg-gray-800/40 hover:text-white'}`}>
-            {t.icon}{t.label}
-          </button>
-        ))}
-      </div>
+      {visibleTabs.length > 1 && (
+        <div className="flex flex-wrap gap-2">
+          {visibleTabs.map((t) => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${tab === t.id ? 'border-emerald-500/30 bg-emerald-600/10 text-emerald-400' : 'border-gray-800 text-gray-400 hover:bg-gray-800/40 hover:text-white'}`}>
+              {t.icon}{t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* ── CURSOS ── */}
       {tab === 'cursos' && (
         <>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            {SYSTEMS.map((s) => {
+            {courses.map((s) => {
               const Icon = s.icon;
               const active = s.id === system.id;
               return (
@@ -681,7 +733,7 @@ export default function Academy() {
 
               <div className="rounded-lg border border-gray-800 bg-ai-card p-4">
                 <h3 className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-400"><PlayCircle className="h-4 w-4 text-emerald-400" /> Praticar</h3>
-                <p className="text-[11px] leading-relaxed text-gray-400">Use o <span className="font-bold text-emerald-300">Simulador IA</span> (Ferramentas de Venda) para treinar chamadas com personas reais e receber avaliação. Depois pratique o <span className="font-bold text-emerald-300">Playbook de Demo</span>.</p>
+                <p className="text-[11px] leading-relaxed text-gray-400">Treine com o <span className="font-bold text-emerald-300">Roteiro da demo</span> e com os <span className="font-bold text-emerald-300">Argumentos</span> (Ferramentas de venda): leia as respostas em voz alta e use a calculadora num caso de exemplo.</p>
               </div>
             </div>
           </div>

@@ -141,8 +141,29 @@ export interface CallAnalysis {
   raw?: string;
 }
 
+export type SaleItem = 'workio' | 'sol' | 'emet' | 'sistema' | 'site' | 'avenca_mensal' | 'avenca_anual';
+
+/** Venda de um artigo associada a um vendedor. `amount` vazio = valor ainda por lancar. */
+export interface CrmSale {
+  id: string;
+  soldAt: string; // AAAA-MM-DD
+  sellerId?: string;
+  sellerName?: string; // copia do nome no momento do registo
+  item: SaleItem;
+  leadId?: string;
+  clientName: string;
+  amount?: number;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Sistemas que a equipa vende; scripts, objecoes e materiais pertencem a um deles. */
+export type CommercialSystem = 'workio' | 'sol' | 'emet';
+
 export interface CrmScript {
   id: string;
+  system?: CommercialSystem; // por omissao: sol (conteudo anterior)
   name: string;
   targetRole?: string; // reception | manager | housekeeper | general
   language?: string;
@@ -155,6 +176,7 @@ export interface CrmScript {
 
 export interface CrmObjection {
   id: string;
+  system?: CommercialSystem;
   objection: string;
   suggestedResponse: string; // resposta curta
   fullResponse?: string; // resposta completa
@@ -184,9 +206,18 @@ export type CrmMaterialType = 'image' | 'video' | 'pdf' | 'link' | 'text';
 
 export interface CrmMaterial {
   id: string;
+  system?: CommercialSystem;
+  /** Modulo do sistema (Workio: M01..M27; SOL: nome do modulo; EMET: texto livre). Vazio = geral. */
+  moduleCode?: string;
   title: string;
   materialType: CrmMaterialType;
+  /** Ficheiro anexado (URL publico do armazenamento) ou link externo */
   url?: string;
+  /** Texto escrito (materiais do tipo "text") */
+  content?: string;
+  fileName?: string;
+  fileType?: string;
+  fileSize?: number;
   description?: string;
   targetStage?: string;
   active: boolean;

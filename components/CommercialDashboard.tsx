@@ -225,7 +225,8 @@ export default function CommercialDashboard({ restrictSellerId }: CommercialDash
         {perSeller.length === 0 ? (
           <p className="p-8 text-center text-xs text-gray-500">Sem vendedores registados.</p>
         ) : (
-          <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-xs">
             <thead>
               <tr className="border-b border-gray-800 bg-ai-dark text-[10px] font-bold uppercase tracking-wider text-gray-500">
                 <th className="px-4 py-2">Vendedor</th>
@@ -257,6 +258,7 @@ export default function CommercialDashboard({ restrictSellerId }: CommercialDash
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
