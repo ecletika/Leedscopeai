@@ -145,7 +145,7 @@ export default function PeopleFinderModal({ lead, website, targetRoles, existing
   };
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div className="flex max-h-full w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
           <h3 className="flex items-center gap-2 text-sm font-bold text-gray-900"><User className="h-4 w-4 text-emerald-600" /> Encontrar pessoas · {lead.companyName}</h3>

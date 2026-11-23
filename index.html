@@ -38,6 +38,12 @@
       }
     </script>
     <style>
+      /* Telemovel: modais nunca maiores que o ecra, com scroll interno; evita zoom do iOS nos campos */
+      @media (max-width: 767px) {
+        .fixed.inset-0.items-center > * { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+        input, select, textarea { font-size: 16px !important; }
+        html, body { overflow-x: hidden; }
+      }
       /* ----- Base: tema ESCURO (predefinicao) ----- */
       body { background-color: #0f172a; color: #e2e8f0; }
       ::-webkit-scrollbar { width: 8px; height: 8px; }

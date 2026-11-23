@@ -24,7 +24,7 @@ import Academy from './Academy';
 import WorkioCatalog from './WorkioCatalog';
 import AdminSales from './AdminSales';
 import { canAccessAdminConsole } from '../services/accessControl';
-import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, CalendarClock, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, Users, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot, BarChart3, KanbanSquare, BookOpen, RotateCcw, Lightbulb, GraduationCap, FileSignature } from 'lucide-react';
+import { Target, MapPin, Loader2, Database, Mail, Globe, AlertTriangle, CheckCircle, Search, Sparkles, SlidersHorizontal, Settings, Server, Shield, Lock, Save, Activity, Wifi, LogOut, Hash, Calendar, CalendarClock, Instagram, Facebook, Linkedin, Youtube, Video, Eye, Filter, UserCog, User as UserIcon, Users, History, Edit, CreditCard, ChevronRight, Plus, Trash2, X, FileText, Bot, BarChart3, KanbanSquare, BookOpen, RotateCcw, Lightbulb, GraduationCap, FileSignature, Menu } from 'lucide-react';
 import { searchLeadsInLocation, analyzeAndGenerateProposal, generateOutreachEmail, runStorefrontInvestigation, generateCommercialProposal, askLeadQuestion, generateWebsiteCode, refineWebsiteCode } from '../services/geminiService';
 import { hotelDb } from '../services/hotelDb';
 import { crmDb } from '../services/crmDb';
@@ -87,7 +87,13 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout }: DashboardProps) {
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [activeTab, setActiveTabState] = useState<TabId>('dashboard');
+  // Menu lateral em gaveta no telemovel (abaixo de md o menu fica escondido)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const setActiveTab = (tab: TabId) => {
+    setActiveTabState(tab);
+    setMobileNavOpen(false);
+  };
   // "Hoje": follow-ups e planeador semanal no mesmo ecra
   const [todayView, setTodayView] = useState<'followup' | 'planner'>('followup');
 
@@ -701,8 +707,14 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
   ];
 
   return (
-    <div className="flex h-screen bg-ai-dark text-white overflow-hidden font-sans">
-      <aside className="sol-sidebar w-64 h-screen min-h-0 border-r border-gray-800 hidden md:flex flex-col p-4 shrink-0">
+    <div className="flex h-[100dvh] bg-ai-dark text-white overflow-hidden font-sans">
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 md:hidden" onClick={() => setMobileNavOpen(false)} aria-hidden="true" />
+      )}
+      <aside className={`sol-sidebar w-64 max-w-[85vw] h-[100dvh] min-h-0 border-r border-gray-800 flex flex-col p-4 shrink-0 bg-ai-dark fixed inset-y-0 left-0 z-50 transition-transform duration-200 md:static md:z-auto md:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <button onClick={() => setMobileNavOpen(false)} className="md:hidden absolute top-4 right-3 p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800" aria-label="Fechar menu">
+          <X className="w-5 h-5" />
+        </button>
         <div className="flex items-center gap-2 mb-8 px-2 shrink-0">
             <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-white shadow-lg shadow-emerald-500/20">
               {/* «W» do Workio, com as cores da marca */}
@@ -754,9 +766,12 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <header className="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-ai-dark shrink-0">
-            <h1 className="font-bold text-white tracking-tight flex items-center gap-2">
+      <main className="flex-1 min-w-0 flex flex-col h-[100dvh] overflow-hidden relative">
+        <header className="min-h-16 border-b border-gray-800 flex items-center justify-between gap-2 px-3 md:px-6 py-2 bg-ai-dark shrink-0">
+            <button onClick={() => setMobileNavOpen(true)} className="md:hidden p-2 -ml-1 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800 shrink-0" aria-label="Abrir menu">
+                <Menu className="w-5 h-5" />
+            </button>
+            <h1 className="font-bold text-white tracking-tight flex items-center gap-2 text-sm md:text-base truncate min-w-0 flex-1">
                 {activeTab === 'dashboard' && 'Nova Prospeção'}
                 {activeTab === 'database' && 'Base de Dados de Hotéis & CRM'}
                 {activeTab === 'pipeline' && 'Pipeline Comercial'}
@@ -770,7 +785,7 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                 {activeTab === 'history' && 'Histórico de Pesquisas'}
                 {activeTab === 'admin' && 'Gestão Administrativa'}
             </h1>
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2 md:gap-4 text-sm shrink-0">
                 <ThemeToggle />
                 {currentUser.role === 'admin' && placesUsage ? (
                     <div
@@ -779,23 +794,23 @@ export default function Dashboard({ currentUser, allUsers, setAllUsers, onLogout
                     >
                         <CreditCard className={`w-4 h-4 ${placesUsage.used >= placesUsage.warnAt ? 'text-rose-400' : 'text-emerald-400'}`} />
                         <span className={`font-bold ${placesUsage.used >= placesUsage.warnAt ? 'text-rose-300' : 'text-white'}`}>{Math.max(placesUsage.limit - placesUsage.used, 0)}</span>
-                        <span className="text-gray-400 text-xs">créditos Google</span>
+                        <span className="text-gray-400 text-xs hidden sm:inline">créditos Google</span>
                     </div>
                 ) : (
                     <div className="px-3 py-1 bg-gray-800 border border-gray-700 rounded-full flex items-center gap-2">
                         <CreditCard className="w-4 h-4 text-emerald-400" />
                         <span className="font-bold text-white">{currentUser.credits}</span>
-                        <span className="text-gray-400 text-xs">créditos</span>
+                        <span className="text-gray-400 text-xs hidden sm:inline">créditos</span>
                     </div>
                 )}
-                <ApolloUsagePill />
-                <div className="flex items-center gap-2 text-gray-400 text-xs font-mono">
+                <span className="hidden sm:inline-flex"><ApolloUsagePill /></span>
+                <div className="hidden lg:flex items-center gap-2 text-gray-400 text-xs font-mono">
                     <UserIcon className="w-3.5 h-3.5 text-emerald-500" /> {currentUser.name} ({currentUser.role})
                 </div>
             </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-3 md:p-6">
 
             {/* --- DASHBOARD (NEW CAMPAIGN) --- */}
             {activeTab === 'dashboard' && (

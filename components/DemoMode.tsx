@@ -232,9 +232,9 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
       const slide = valueSlides[clampedIndex - 1];
       const img = MODULE_IMAGES[slide.module];
       return (
-        <div className="grid h-full grid-cols-2">
+        <div className="grid h-full grid-cols-1 overflow-y-auto md:grid-cols-2 md:overflow-visible">
           {/* Metade esquerda — texto */}
-          <div className="flex flex-col justify-center px-12 py-10">
+          <div className="flex flex-col justify-center px-5 py-6 md:px-12 md:py-10">
             <span className="mb-3 inline-flex w-fit items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[11px] font-bold text-rose-600">Problema</span>
             <h2 className="text-2xl font-bold text-gray-900">{slide.problem}</h2>
             <div className="mt-6">
@@ -270,7 +270,7 @@ export default function DemoMode({ lead, onClose, onSaved }: DemoModeProps) {
         <div className="flex h-full flex-col justify-center p-8">
           <h2 className="mb-1 text-2xl font-bold text-gray-900">SOL vs WhatsApp / Papel / Excel</h2>
           <p className="mb-5 text-sm text-gray-500">Muitos hoteis comecam no WhatsApp. Eis a diferenca na pratica.</p>
-          <div className="overflow-hidden rounded-2xl border border-gray-200 shadow-sm">
+          <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-sm">
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50 text-[11px] font-bold uppercase tracking-wider text-gray-500">

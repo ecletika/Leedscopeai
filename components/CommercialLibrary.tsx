@@ -199,9 +199,9 @@ export default function CommercialLibrary() {
         ))}
       </div>
 
-      <div className="flex items-center gap-1 rounded-lg border border-gray-800 bg-ai-card p-1">
+      <div className="flex items-center gap-1 overflow-x-auto rounded-lg border border-gray-800 bg-ai-card p-1">
         {tabs.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)} className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-bold transition ${tab === t.key ? 'bg-emerald-600/10 text-emerald-300' : 'text-gray-400 hover:text-white'}`}>
+          <button key={t.key} onClick={() => setTab(t.key)} className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-4 py-2 text-xs font-bold transition ${tab === t.key ? 'bg-emerald-600/10 text-emerald-300' : 'text-gray-400 hover:text-white'}`}>
             <t.icon className="h-4 w-4" /> {t.label}
             <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] text-gray-400">{t.count}</span>
           </button>

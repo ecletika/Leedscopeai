@@ -907,18 +907,18 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-gray-50">
+    <div className="fixed inset-0 z-[60] flex h-[100dvh] flex-col overflow-y-auto bg-gray-50 lg:overflow-hidden">
       {/* TOPO - hotel + contactos em strip compacto */}
-      <header className="shrink-0 border-b border-gray-200 bg-white px-6 py-3 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
+      <header className="shrink-0 border-b border-gray-200 bg-white px-3 py-2 shadow-sm md:px-6 md:py-3">
+        <div className="flex items-start justify-between gap-2 md:items-center md:gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <div className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 sm:flex">
               <Phone className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="truncate text-base font-bold text-gray-900">{lead.companyName}</h2>
-                <span className="rounded border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600">MODO PLAY</span>
+                <span className="hidden rounded border border-indigo-300 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-600 sm:inline">MODO PLAY</span>
               </div>
               <div className="mt-0.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
                 <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{lead.location}</span>
@@ -937,7 +937,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
                       ))}
                     </select>
                   ) : (
-                    <a href={`tel:${selectedPhone}`} className="font-mono text-emerald-600 hover:underline">{selectedPhone}</a>
+                    <a href={`tel:${selectedPhone}`} className="whitespace-nowrap font-mono text-emerald-600 hover:underline">{selectedPhone}</a>
                   )}
                   <TwilioCall
                     phoneNumber={selectedPhone}
@@ -1078,22 +1078,22 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
             ))
           )}
           {/* Adicionar contacto inline */}
-          <div className="ml-auto flex items-center gap-1.5">
+          <div className="flex w-full items-center gap-1.5 sm:ml-auto sm:w-auto">
             <select value={newContactType} onChange={(e) => setNewContactType(e.target.value as CrmContactType)} className="rounded border border-gray-300 bg-white px-1.5 py-1 text-[11px] text-gray-700 shadow-sm focus:border-emerald-500 focus:outline-none">
               {contactTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <input value={newContactName} onChange={(e) => setNewContactName(e.target.value)} placeholder="Nome" className="w-24 rounded border border-gray-300 bg-white px-2 py-1 text-[11px] text-gray-900 placeholder-gray-400 shadow-sm focus:border-emerald-500 focus:outline-none" />
-            <input value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} placeholder="Telefone" className="w-28 rounded border border-gray-300 bg-white px-2 py-1 font-mono text-[11px] text-gray-900 placeholder-gray-400 shadow-sm focus:border-emerald-500 focus:outline-none" />
-            <button onClick={handleAddContact} className="flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100">
+            <input value={newContactName} onChange={(e) => setNewContactName(e.target.value)} placeholder="Nome" className="min-w-0 flex-1 sm:w-24 sm:flex-none rounded border border-gray-300 bg-white px-2 py-1 text-[11px] text-gray-900 placeholder-gray-400 shadow-sm focus:border-emerald-500 focus:outline-none" />
+            <input value={newContactPhone} onChange={(e) => setNewContactPhone(e.target.value)} placeholder="Telefone" className="min-w-0 flex-1 sm:w-28 sm:flex-none rounded border border-gray-300 bg-white px-2 py-1 font-mono text-[11px] text-gray-900 placeholder-gray-400 shadow-sm focus:border-emerald-500 focus:outline-none" />
+            <button onClick={handleAddContact} className="flex shrink-0 items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100">
               <Plus className="h-3 w-3" /> Add
             </button>
           </div>
         </div>
       </header>
 
-      <div className="flex flex-1 gap-3 overflow-hidden p-4">
+      <div className="flex shrink-0 flex-col gap-3 p-2 md:p-4 lg:min-h-0 lg:flex-1 lg:shrink lg:flex-row lg:overflow-hidden">
         {/* ESQUERDA — Guião + Resultado da chamada */}
-        <section className="flex flex-1 flex-col gap-3 overflow-y-auto">
+        <section className="flex shrink-0 flex-col gap-3 lg:flex-1 lg:shrink lg:overflow-y-auto">
           {/* Guião */}
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -1305,7 +1305,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         </section>
 
         {/* CENTRO — Demo completa 30 min */}
-        <section className="flex w-[38%] shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+        <section className="flex h-[75dvh] w-full shrink-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm lg:h-auto lg:w-[38%]">
           <div className="shrink-0 space-y-2 border-b border-gray-200 px-4 py-2.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-bold text-indigo-700">Demo completa</span>
@@ -1481,7 +1481,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         </section>
 
         {/* CANTO DIREITO — Banco de objeccoes */}
-        <aside className="flex w-56 shrink-0 flex-col overflow-y-auto">
+        <aside className="flex w-full shrink-0 flex-col lg:w-56 lg:overflow-y-auto">
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
             <h3 className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
               <AlertTriangle className="h-3 w-3" /> Banco de objeccoes
@@ -1525,14 +1525,15 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
       </div>
 
       {/* RODAPE - botoes de resultado */}
-      <footer className="shrink-0 border-t border-gray-200 bg-white px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2">
+      <footer className="sticky bottom-0 z-10 mt-auto shrink-0 border-t border-gray-200 bg-white px-2 py-2 shadow-sm md:px-4 md:py-3" style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+          <div className="-mx-2 flex gap-2 overflow-x-auto px-2 pb-1 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
           {statusButtons.map((b) => (
             <button
               key={b.label}
               onClick={() => handleQuickAction(b)}
               title={b.hint}
-              className={`rounded-lg px-3 py-2 text-[11px] font-bold text-white transition ${pendingStatus === b.status ? `${b.tone} ring-2 ring-gray-400/40` : b.tone}`}
+              className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-[11px] font-bold text-white transition ${pendingStatus === b.status ? `${b.tone} ring-2 ring-gray-400/40` : b.tone}`}
             >
               {b.label}
             </button>
@@ -1540,18 +1541,19 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
           {demoUrls[demoProduct] && (
             <button
               onClick={() => window.open(demoUrls[demoProduct], '_blank')}
-              className="flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-indigo-300 bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
             >
               <Monitor className="h-3.5 w-3.5" />
               Abrir demo comercial
             </button>
           )}
-          <div className="ml-auto flex items-center gap-3">
-            <span className="text-[11px] text-gray-500">Estado final: <span className="font-bold text-gray-800">{statusButtons.find((b) => b.status === pendingStatus)?.label || pendingStatus}</span></span>
+          </div>
+          <div className="flex items-center justify-between gap-3 md:ml-auto md:justify-end">
+            <span className="min-w-0 truncate text-[11px] text-gray-500">Estado final: <span className="font-bold text-gray-800">{statusButtons.find((b) => b.status === pendingStatus)?.label || pendingStatus}</span></span>
             <button
               onClick={() => handleFinish()}
               disabled={saving}
-              className="flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:opacity-60"
+              className="flex shrink-0 items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition hover:bg-emerald-500 disabled:opacity-60"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
               {saving ? 'A guardar...' : 'Guardar e concluir'}
@@ -1574,7 +1576,7 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
       {/* CONFIRMACAO DO BOTAO DE RESULTADO */}
       {quickDialog && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/30 p-4" onClick={() => setQuickDialog(null)}>
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/30 p-4" onClick={() => setQuickDialog(null)}>
           <div className="w-full max-w-md rounded-xl border border-gray-200 bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-sm font-bold text-gray-900">{quickDialog.button.label}</h3>
             {quickDialog.button.hint && <p className="mt-1 text-[11px] text-gray-500">{quickDialog.button.hint}</p>}
@@ -1612,9 +1614,9 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
 
       {/* HISTORICO COMERCIAL */}
       {showHistory && (
-        <div className="absolute inset-0 z-10 flex" onClick={() => setShowHistory(false)}>
+        <div className="fixed inset-0 z-30 flex" onClick={() => setShowHistory(false)}>
           <div className="flex-1 bg-black/20" />
-          <aside className="flex h-full w-96 flex-col border-l border-gray-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <aside className="flex h-full w-full max-w-96 flex-col border-l border-gray-200 bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
               <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-gray-600"><ClipboardList className="h-4 w-4 text-emerald-500" /> Historico comercial</h3>
               <button onClick={() => setShowHistory(false)} className="text-gray-400 hover:text-gray-700"><X className="h-4 w-4" /></button>
