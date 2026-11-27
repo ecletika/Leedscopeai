@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Mic, MicOff, Phone, PhoneOff, Settings, X } from 'lucide-react';
+import { Delete, Grid3x3, Loader2, Mic, MicOff, Phone, PhoneOff, Settings, X } from 'lucide-react';
 import { isEmetActive, loadEmetConfig, saveEmetConfig, startEmetCall } from '../services/emetService';
 import type { EmetCall, EmetConfig } from '../services/emetService';
 import { getTwilioDevice } from '../services/twilioService';
@@ -18,6 +18,9 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
   const [error, setError] = useState('');
+  // Teclado (DTMF) para menus automaticos: "prima 1 para...", extensoes, etc.
+  const [showKeypad, setShowKeypad] = useState(false);
+  const [sentDigits, setSentDigits] = useState('');
 
   const callRef = useRef<Call | EmetCall | null>(null);
   const [showCfg, setShowCfg] = useState(false);
@@ -122,6 +125,88 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
     setMuted(next);
   };
 
+  const sendDigit = (d: string) => {
+    const c: any = callRef.current;
+    if (!c || typeof c.sendDigits !== 'function') return;
+    try { c.sendDigits(d); } catch { /* ignore */ }
+    setSentDigits((prev) => (prev + d).slice(-24));
+  };
+
+  // Com o teclado aberto, as teclas do computador tambem enviam os tons
+  useEffect(() => {
+    if (!showKeypad) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (/^[0-9*#]$/.test(e.key)) { e.preventDefault(); sendDigit(e.key); }
+      if (e.key === 'Escape') setShowKeypad(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showKeypad]);
+
+  // Fecha o teclado quando a chamada termina
+  useEffect(() => {
+    if (state !== 'connected' && state !== 'dialing') { setShowKeypad(false); setSentDigits(''); }
+  }, [state]);
+
+  const KEYS: Array<[string, string]> = [
+    ['1', ''], ['2', 'ABC'], ['3', 'DEF'],
+    ['4', 'GHI'], ['5', 'JKL'], ['6', 'MNO'],
+    ['7', 'PQRS'], ['8', 'TUV'], ['9', 'WXYZ'],
+    ['*', ''], ['0', '+'], ['#', '']
+  ];
+
+  const keypadButton = (
+    <button
+      type="button"
+      onClick={() => setShowKeypad((v) => !v)}
+      title="Teclado (para menus: prima 1, 2...)"
+      aria-label="Abrir teclado"
+      aria-expanded={showKeypad}
+      className={`rounded-full p-1 transition ${showKeypad ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}`}
+    >
+      <Grid3x3 className="h-3 w-3" />
+    </button>
+  );
+
+  const keypadPanel = showKeypad && (
+    <div
+      role="dialog"
+      aria-label="Teclado da chamada"
+      className="fixed inset-x-0 bottom-0 z-50 rounded-t-2xl border border-gray-200 bg-white p-4 shadow-2xl sm:absolute sm:inset-x-auto sm:bottom-auto sm:left-0 sm:top-full sm:mt-2 sm:w-64 sm:rounded-2xl"
+      style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="min-h-[28px] flex-1 truncate rounded-lg bg-gray-50 px-3 py-1 text-center font-mono text-lg font-bold tracking-widest text-gray-800">
+          {sentDigits || <span className="text-xs font-normal tracking-normal text-gray-400">Toque nas teclas</span>}
+        </div>
+        {sentDigits && (
+          <button type="button" onClick={() => setSentDigits('')} title="Limpar o visor" aria-label="Limpar o visor" className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+            <Delete className="h-4 w-4" />
+          </button>
+        )}
+        <button type="button" onClick={() => setShowKeypad(false)} aria-label="Fechar teclado" className="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="mx-auto grid max-w-xs grid-cols-3 gap-2">
+        {KEYS.map(([k, letters]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => sendDigit(k)}
+            className="flex h-14 flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 text-gray-900 transition active:scale-95 active:bg-emerald-100 hover:bg-gray-100 sm:h-12"
+          >
+            <span className="text-xl font-bold leading-none">{k}</span>
+            <span className="mt-0.5 h-3 text-[9px] font-bold tracking-wider text-gray-400">{letters}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mt-3 text-center text-[10px] text-gray-400">Cada tecla é enviada logo para a chamada. No computador pode usar as teclas 0-9, * e #.</p>
+    </div>
+  );
+
   const reset = () => {
     setState('idle');
     setDuration(0);
@@ -146,7 +231,8 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
   );
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="relative flex items-center gap-2">
+      {keypadPanel}
       {state === 'idle' && (
         <button onClick={() => setShowCfg(true)} title="Configurar extensão EMET" className="rounded-full p-1 text-gray-400 hover:text-emerald-600">
           <Settings className="h-3.5 w-3.5" />
@@ -194,6 +280,7 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
           <span className="text-[11px] font-bold text-amber-700">
             {state === 'initializing' ? 'A inicializar...' : `A ligar para ${leadName}...`}
           </span>
+          {state === 'dialing' && keypadButton}
           <button onClick={handleHangUp} className="ml-1 text-rose-500 hover:text-rose-700">
             <PhoneOff className="h-3.5 w-3.5" />
           </button>
@@ -214,6 +301,7 @@ export default function TwilioCall({ phoneNumber, leadName, onCallEnded }: Twili
           >
             {muted ? <MicOff className="h-3 w-3" /> : <Mic className="h-3 w-3" />}
           </button>
+          {keypadButton}
           <button
             onClick={handleHangUp}
             className="rounded-full bg-rose-100 p-1 text-rose-600 transition hover:bg-rose-200"
