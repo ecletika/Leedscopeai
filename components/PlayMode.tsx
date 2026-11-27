@@ -16,6 +16,8 @@ import {
   MapPin,
   MessageSquare,
   MessagesSquare,
+  Pencil,
+  Save,
   Monitor,
   Phone,
   Plus,
@@ -48,6 +50,9 @@ import PeopleFinderModal from './PeopleFinderModal';
 import { getSegment } from '../services/segments';
 import { WORKIO_MODULES } from '../services/workioModules';
 import { destroyTwilioDevice } from '../services/twilioService';
+
+const MAIN_SCRIPT_NAME = 'Guião principal';
+const BUILTIN_SCRIPT_ID = '__builtin__';
 import { destroyEmetUA } from '../services/emetService';
 import { analyzeCallNotes } from '../services/geminiService';
 import { computeLeadScore } from '../services/leadScoring';
@@ -452,6 +457,11 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
   const [dbObjections, setDbObjections] = useState<CrmObjection[]>([]);
   const [dbMaterials, setDbMaterials] = useState<CrmMaterial[]>([]);
   const [selectedScriptId, setSelectedScriptId] = useState<string>('');
+  // Edicao do guiao (lapis): grava na biblioteca de Scripts, visivel para toda a equipa
+  const [editingScript, setEditingScript] = useState(false);
+  const [scriptDraft, setScriptDraft] = useState('');
+  const [savingScript, setSavingScript] = useState(false);
+  const [scriptSaveError, setScriptSaveError] = useState<string | null>(null);
 
   // Resultado da chamada
   const [interest, setInterest] = useState<'low' | 'medium' | 'high'>('medium');
@@ -612,7 +622,59 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
     : scriptProduct === 'sol' && dbObjectionsForProduct.length === 0
     ? objectionBank.map((o) => ({ objection: o.objection, response: o.response }))
     : dbObjectionsForProduct;
-  const selectedScript = scriptsForProduct.find((s) => s.id === selectedScriptId);
+  // '' = automatico (o guiao principal editado, se existir; senao o guiao padrao); BUILTIN = sempre o padrao
+  const mainScript = scriptsForProduct.find((s) => s.name === MAIN_SCRIPT_NAME);
+  const selectedScript = selectedScriptId === BUILTIN_SCRIPT_ID
+    ? undefined
+    : selectedScriptId
+    ? scriptsForProduct.find((s) => s.id === selectedScriptId)
+    : mainScript;
+
+  /** Texto do guiao padrao, com [NOME] no lugar do nome do vendedor, para servir de ponto de partida na edicao. */
+  const builtinScriptText = (product: ProductId): string => {
+    if (product === 'workio') {
+      const w = buildWorkioScript(workioPitchSegment, '[NOME]');
+      return [...w.paragraphs, w.closingQuestion, 'Perguntas de qualificação:', ...w.qualification.map((q) => `• ${q}`)].join('\n\n').replace(/\n\n•/g, '\n•');
+    }
+    if (product === 'sol') {
+      return [
+        'Olá, bom dia. O meu nome é [NOME] e falo da SOL.',
+        'Estamos a contactar alguns hotéis independentes porque desenvolvemos uma plataforma simples para ajudar equipas de housekeeping, receção e manutenção a coordenarem melhor quartos, limpezas, inspeções e pedidos internos.',
+        'Normalmente falamos com o gerente ou com a governanta, porque o sistema ajuda a resolver problemas como quartos prontos tarde, comunicação por WhatsApp e falta de visibilidade sobre limpezas e manutenção.',
+        'A ideia não é tomar muito tempo agora. Gostava de perceber se faz sentido marcar uma apresentação rápida de 15 a 20 minutos para mostrar como funciona na prática.',
+        'Com quem seria melhor falar sobre este tema: o gerente, a governanta ou outra pessoa responsável pelas operações?'
+      ].join('\n\n');
+    }
+    return '';
+  };
+
+  const startEditScript = () => {
+    setScriptDraft(selectedScript ? selectedScript.content : builtinScriptText(scriptProduct));
+    setScriptSaveError(null);
+    setEditingScript(true);
+  };
+
+  const saveScriptEdit = async () => {
+    const content = scriptDraft.trim();
+    if (!content) { setScriptSaveError('O guião não pode ficar vazio.'); return; }
+    setSavingScript(true);
+    setScriptSaveError(null);
+    const now = new Date().toISOString();
+    const script: CrmScript = selectedScript
+      ? { ...selectedScript, content, updatedAt: now }
+      : { id: crypto.randomUUID(), system: scriptProduct, name: MAIN_SCRIPT_NAME, targetRole: 'general', language: 'PT', country: 'Portugal', content, active: true, createdAt: now, updatedAt: now };
+    try {
+      const ok = await crmDb.saveScript(script);
+      setDbScripts((prev) => [...prev.filter((x) => x.id !== script.id), script]);
+      setSelectedScriptId(script.id);
+      setEditingScript(false);
+      if (!ok) setScriptSaveError('Guardado só neste dispositivo: não foi possível gravar na base de dados.');
+    } catch {
+      setScriptSaveError('Não foi possível guardar o guião. Tente novamente.');
+    } finally {
+      setSavingScript(false);
+    }
+  };
   // Materiais do sistema da demo, separados por modulo (se escolheu um modulo Workio, so desse modulo)
   const demoMaterials = dbMaterials.filter((m) =>
     (m.system || 'sol') === demoProduct && (demoProduct !== 'workio' || !focusModule || !m.moduleCode || m.moduleCode === focusModule) && (m.url || m.content)
@@ -1096,19 +1158,53 @@ export default function PlayMode({ lead, sellers, closeReasons, onClose, onSaved
         <section className="flex shrink-0 flex-col gap-3 lg:flex-1 lg:shrink lg:overflow-y-auto">
           {/* Guião */}
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-            <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
               <h3 className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-700">
                 <MessageSquare className="h-3.5 w-3.5" /> Guiao de chamada
               </h3>
-              {renderProductTabs(scriptProduct, setScriptProduct, 'Produto do guião')}
-              {scriptsForProduct.length > 0 && (
-                <select value={selectedScript ? selectedScriptId : ''} onChange={(e) => setSelectedScriptId(e.target.value)} aria-label="Escolher guião" className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[11px] text-gray-700 shadow-sm focus:border-emerald-500 focus:outline-none">
-                  <option value="">Guiao padrao</option>
+              {renderProductTabs(scriptProduct, (p) => { setScriptProduct(p); setSelectedScriptId(''); setEditingScript(false); }, 'Produto do guião')}
+              {scriptsForProduct.length > 0 && !editingScript && (
+                <select value={selectedScript ? selectedScript.id : BUILTIN_SCRIPT_ID} onChange={(e) => setSelectedScriptId(e.target.value)} aria-label="Escolher guião" className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[11px] text-gray-700 shadow-sm focus:border-emerald-500 focus:outline-none">
+                  <option value={BUILTIN_SCRIPT_ID}>Guião padrão (original)</option>
                   {scriptsForProduct.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               )}
+              {!editingScript && (
+                <button
+                  type="button"
+                  onClick={startEditScript}
+                  title="Editar o texto do guião"
+                  aria-label="Editar o texto do guião"
+                  className="ml-auto flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[11px] font-bold text-emerald-700 shadow-sm transition hover:bg-emerald-100"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Editar
+                </button>
+              )}
             </div>
-            {selectedScript ? (
+            {scriptSaveError && <p className="mb-2 text-[11px] font-semibold text-amber-700">{scriptSaveError}</p>}
+            {editingScript ? (
+              <div className="space-y-2">
+                <textarea
+                  value={scriptDraft}
+                  onChange={(e) => setScriptDraft(e.target.value)}
+                  rows={12}
+                  autoFocus
+                  aria-label="Texto do guião"
+                  className="w-full resize-y rounded-lg border border-emerald-300 bg-white p-3 text-[13px] leading-relaxed text-gray-800 shadow-sm focus:border-emerald-500 focus:outline-none"
+                />
+                <p className="text-[11px] text-gray-500">
+                  Use <span className="font-mono font-bold">[NOME]</span> onde deve aparecer o nome do vendedor. {selectedScript ? <>Vai alterar o guião <span className="font-bold">{selectedScript.name}</span>.</> : <>Fica guardado como <span className="font-bold">{MAIN_SCRIPT_NAME}</span> e passa a abrir por omissão.</>} Também aparece em Scripts &amp; Materiais.
+                </p>
+                <div className="flex items-center justify-end gap-2">
+                  <button type="button" onClick={() => { setEditingScript(false); setScriptSaveError(null); }} disabled={savingScript} className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-[11px] font-bold text-gray-600 transition hover:bg-gray-50">
+                    Cancelar
+                  </button>
+                  <button type="button" onClick={saveScriptEdit} disabled={savingScript} className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition hover:bg-emerald-500 disabled:opacity-60">
+                    {savingScript ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Guardar guião
+                  </button>
+                </div>
+              </div>
+            ) : selectedScript ? (
               <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-gray-800">
                 {selectedScript.content.replace(/\[NOME\]/g, nameFor(scriptProduct))}
               </div>
