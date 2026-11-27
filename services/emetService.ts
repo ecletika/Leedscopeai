@@ -116,6 +116,8 @@ export function destroyEmetUA() {
 export interface EmetCall {
   hangup: () => void;
   mute: (m: boolean) => void;
+  /** Envia teclas (DTMF) para menus automaticos: 0-9, * e # */
+  sendDigits: (digits: string) => void;
 }
 
 export function normalizeNumber(n: string): string {
@@ -184,5 +186,6 @@ export async function startEmetCall(
   return {
     hangup: () => { try { session.terminate(); } catch { /* ignore */ } },
     mute: (m) => { m ? session.mute({ audio: true }) : session.unmute({ audio: true }); },
+    sendDigits: (digits) => { try { session.sendDTMF(digits); } catch { /* ignore */ } },
   };
 }
